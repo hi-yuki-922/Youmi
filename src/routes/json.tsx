@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
+import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -39,7 +39,6 @@ function JsonToolPage() {
   const [output, setOutput] = useState("");
   const [indent, setIndent] = useState<JsonIndent>(2);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
-  const [copied, setCopied] = useState(false);
 
   const runTransform = (
     transform: () => { ok: true; value: string } | JsonFailure,
@@ -65,13 +64,6 @@ function JsonToolPage() {
     setStatus(result.ok ? { kind: "success", text: "JSON 合法" } : failureToStatus(result));
   };
 
-  const handleCopy = async () => {
-    if (!output) return;
-    await navigator.clipboard.writeText(output);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
   return (
     <div className="flex h-full flex-col gap-4 p-6">
       <div className="flex items-center justify-between">
@@ -91,10 +83,7 @@ function JsonToolPage() {
               <SelectItem value="tab">Tab</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={handleCopy} disabled={!output}>
-            {copied ? <Check data-slot="icon" /> : <Copy data-slot="icon" />}
-            {copied ? "已复制" : "复制结果"}
-          </Button>
+          <CopyButton text={output} />
         </div>
       </div>
 

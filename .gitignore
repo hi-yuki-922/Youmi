@@ -1,0 +1,13 @@
+# ZCode client workspace dir (skills here are a junction into .agents/skills)
+.zcode/
+
+# Node
+node_modules/
+dist/
+
+# Rust
+src-tauri/target/
+
+# OS / editor
+Thumbs.db
+.DS_Store

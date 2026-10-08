@@ -1,0 +1,209 @@
+{
+  "version": 1,
+  "skills": {
+    "ask-matt": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/ask-matt/SKILL.md",
+      "computedHash": "434a6d8eea2681a25c6480526a6f6829679411eac5c278fe67e824fb458d2bde"
+    },
+    "code-review": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/code-review/SKILL.md",
+      "computedHash": "b870c6434d8ea31145752f238df4135b3a0db471d4aa9fbae60303f62c68a441"
+    },
+    "codebase-design": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/codebase-design/SKILL.md",
+      "computedHash": "a95ccbbfe27fd63ddc3b942cd5bc4e2abbd2d66bd18493963845d9b2ba168f46"
+    },
+    "diagnosing-bugs": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
+      "computedHash": "6e252e10ea92fcb93c4557f69c90336fd4293df2856a1667f9f74a25f648d43e"
+    },
+    "domain-modeling": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/domain-modeling/SKILL.md",
+      "computedHash": "7d96281345725a73efd26e7836adee01812889e4ac0b1a75f1149354ee283a4f"
+    },
+    "grill-me": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grill-me/SKILL.md",
+      "computedHash": "1c4bb3229c1c033cdf289ce756677685cabb2ace547b61936d8f5ebf781f9b9a"
+    },
+    "grill-with-docs": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
+      "computedHash": "387b6acaf43e841d6910f58d896b8b6de4aab8447c6dba536641d7e83e0ed330"
+    },
+    "grilling": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grilling/SKILL.md",
+      "computedHash": "f8fe1a117777e04302fe847b2fbc2e18cbac5719b6e45e05f94334ab23a1b45b"
+    },
+    "handoff": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/handoff/SKILL.md",
+      "computedHash": "573f917e2a566b06e7e02ada99cfd214c84bfcd2f57b8313055e7063e80130a0"
+    },
+    "implement": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/implement/SKILL.md",
+      "computedHash": "dffc799f49459dab9af99737ad789a88fb62e3986f2e2681df9a67e4d5bf9b04"
+    },
+    "implement-spec": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/implement-spec/SKILL.md",
+      "computedHash": "a826098f02e5e0383553dd8493f9b2d0ed61529c1f34d508e9a09d8de5ba2303"
+    },
+    "improve-codebase-architecture": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "67808e5c447ec48ce5117652ffc608b6f8a0ad13d5dc2b0642cc299bd3f15f86"
+    },
+    "migrate-to-shoehorn": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/misc/migrate-to-shoehorn/SKILL.md",
+      "computedHash": "3ef24881d2e62ded9293f3d7ed4d65b5d3cf0f337946ee3cacc313f929394336"
+    },
+    "prototype": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/prototype/SKILL.md",
+      "computedHash": "ec95c87f650b08064a6442b5c7f1d8f2671e15baa2c02a2f98954d1e9906e6dc"
+    },
+    "research": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/research/SKILL.md",
+      "computedHash": "9249aca13b9601f2850ef83f936176a44c2bf56e9f1d504da2b01cbaf9d51129"
+    },
+    "resolving-merge-conflicts": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/resolving-merge-conflicts/SKILL.md",
+      "computedHash": "1766ed116d6af423c1415137c5b4f069024467b2e6659c6dd47645da5072166a"
+    },
+    "retro": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/retro/SKILL.md",
+      "computedHash": "fd0f079ca2e7a0745f055b9b324068bbc43f76620aefacd3c5ed62df766e97c9"
+    },
+    "scaffold-exercises": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/misc/scaffold-exercises/SKILL.md",
+      "computedHash": "4ec4174d198f767b708515388e7cffa61325ba71ae6b5496f3fc975b54569b8c"
+    },
+    "setup-matt-pocock-skills": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/setup-matt-pocock-skills/SKILL.md",
+      "computedHash": "00b75cd0a4d1d9835c1c94bb498695359a37a8c1279475c7f319cdcb1b750ec2"
+    },
+    "setup-pre-commit": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/misc/setup-pre-commit/SKILL.md",
+      "computedHash": "d5c696745d7f0ff487c4fa3e6409f7ca339427b6bf1dd20f2f4f42e6d9c03e34"
+    },
+    "setup-ts-deep-modules": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/setup-ts-deep-modules/SKILL.md",
+      "computedHash": "1036bc1b4ad5deccaa994efbf609f4d877810dc8f320526ca31d759c9c160616"
+    },
+    "tdd": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "8c6119139beaca80d77aa72a8de10fcb33722c6dc35b08fefd94e5726996f727"
+    },
+    "teach": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/teach/SKILL.md",
+      "computedHash": "44472217b605c2e8b68aa74e1eb06c6c4954166e306d1d6f24cff92069b2e889"
+    },
+    "to-questionnaire": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/to-questionnaire/SKILL.md",
+      "computedHash": "8a6e13659eff80835e169385fa3bfd5822a24e25a48c96383ef10e90fb0c4d20"
+    },
+    "to-spec": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-spec/SKILL.md",
+      "computedHash": "31a934e18400176e95c206aabab50810c7e6f70bdde9e57c77281ced5db412b3"
+    },
+    "to-tickets": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/to-tickets/SKILL.md",
+      "computedHash": "453fa4c9efcbf7d4d92727e59292bb4ff0e0278046057684d69bca981e5b8fdb"
+    },
+    "triage": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/triage/SKILL.md",
+      "computedHash": "990229a7cf50909eca9632dacca34124aad74868bd790da648eee2d19cce3406"
+    },
+    "wait-what": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/wait-what/SKILL.md",
+      "computedHash": "1d50fa4c61fbe9d78f491551c7afd89d425951aba0c9fb38fc17030425ad3cf9"
+    },
+    "wayfinder": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/wayfinder/SKILL.md",
+      "computedHash": "57055eec22d0490e971556de5e3577ebf7a93efcf57cc79bb3a489226f383c9f"
+    },
+    "wizard": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/wizard/SKILL.md",
+      "computedHash": "d9f08c402b4de886ad6c9274faa69e4b5305902563a012efe696c42416198e80"
+    },
+    "writing-beats": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/writing-beats/SKILL.md",
+      "computedHash": "d549d70c7f543b532ce1b6c77f1642543679f25b1bdef54ea32cdd29134d355d"
+    },
+    "writing-for-agents": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/writing-for-agents/SKILL.md",
+      "computedHash": "859be0264ea731a7d3f8d736a8c3d9b93f3f5fdb03c227bb09f16dadc80d865b"
+    },
+    "writing-fragments": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/writing-fragments/SKILL.md",
+      "computedHash": "f4561da5ab163342ba17df202bfaf4ea2e0a434d27588cfb0c7ce9e73c407969"
+    },
+    "writing-shape": {
+      "source": "vinvcn/mattpocock-skills-zh-CN",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/writing-shape/SKILL.md",
+      "computedHash": "0537de2d051fed5a0c11db29b7b5014a9d18ead56470b7b04dae6d3b1327fefa"
+    }
+  }
+}

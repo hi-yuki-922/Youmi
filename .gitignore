@@ -29,3 +29,6 @@ lerna-debug.log*
 *.sw?
 Thumbs.db
 .DS_Store
+
+# GUI test evidence
+gui-test-screenshots/

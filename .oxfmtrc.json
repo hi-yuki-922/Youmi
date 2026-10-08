@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "src/routeTree.gen.ts",
+    ".agents/",
+    ".scratch/",
+    ".zcode/",
+    "docs/",
+    "node_modules/",
+    "dist/",
+    "src-tauri/target/"
+  ]
+}

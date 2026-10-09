@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { LabeledTextarea } from "@/components/ui/labeled-textarea";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import {
   base64ToText,
   dataUriToSvg,
@@ -36,29 +36,12 @@ function EncodingToolPage() {
   return (
     <div className="flex h-full flex-col gap-4 p-6">
       <h1 className="text-xl font-semibold">编码转换</h1>
-      <div
-        role="tablist"
+      <SegmentedTabs
         aria-label="编码转换子工具"
-        className="flex w-fit gap-1 rounded-lg bg-muted p-1"
-      >
-        {SUB_TOOLS.map((tool) => (
-          <button
-            key={tool.id}
-            type="button"
-            role="tab"
-            aria-selected={active === tool.id}
-            onClick={() => setActive(tool.id)}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm transition-colors",
-              active === tool.id
-                ? "bg-background font-medium text-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {tool.label}
-          </button>
-        ))}
-      </div>
+        options={SUB_TOOLS}
+        value={active}
+        onChange={setActive}
+      />
 
       {active === "svg-url" && (
         <InstantConverter
@@ -83,39 +66,6 @@ function EncodingToolPage() {
         />
       )}
       {active === "query" && <QueryTableTool />}
-    </div>
-  );
-}
-
-function ConverterPane({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  const id = useId();
-
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium text-muted-foreground">
-          {label}
-        </label>
-        <CopyButton text={value} variant="ghost" />
-      </div>
-      <Textarea
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="min-h-0 flex-1 resize-none font-mono text-sm"
-        spellCheck={false}
-      />
     </div>
   );
 }
@@ -174,17 +124,19 @@ function InstantConverter({
       <p className="text-sm text-muted-foreground">{hint}</p>
       <ErrorStrip message={error} />
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
-        <ConverterPane
+        <LabeledTextarea
           label={leftLabel}
           value={left}
-          onChange={handleLeftChange}
+          onChange={(event) => handleLeftChange(event.target.value)}
           placeholder={leftPlaceholder}
+          action={<CopyButton text={left} variant="ghost" />}
         />
-        <ConverterPane
+        <LabeledTextarea
           label={rightLabel}
           value={right}
-          onChange={handleRightChange}
+          onChange={(event) => handleRightChange(event.target.value)}
           placeholder={rightPlaceholder}
+          action={<CopyButton text={right} variant="ghost" />}
         />
       </div>
     </section>
@@ -232,11 +184,12 @@ function QueryTableTool() {
       <p className="text-sm text-muted-foreground">双向即时转换：编辑任意一侧，另一侧同步更新。</p>
       <ErrorStrip message={error} />
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
-        <ConverterPane
+        <LabeledTextarea
           label="Query 字符串"
           value={query}
-          onChange={handleQueryChange}
+          onChange={(event) => handleQueryChange(event.target.value)}
           placeholder="粘贴 query 字符串或完整 URL"
+          action={<CopyButton text={query} variant="ghost" />}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center justify-between">

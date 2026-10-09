@@ -9,148 +9,204 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as DiffRouteImport } from './routes/diff'
-import { Route as EncodingRouteImport } from './routes/encoding'
-import { Route as JsonRouteImport } from './routes/json'
-import { Route as PasswordBookRouteImport } from './routes/password-book'
-import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as MainRouteImport } from './routes/_main'
+import { Route as MainIndexRouteImport } from './routes/_main/index'
+import { Route as MainDiffRouteImport } from './routes/_main/diff'
+import { Route as MainEncodingRouteImport } from './routes/_main/encoding'
+import { Route as MainJsonRouteImport } from './routes/_main/json'
+import { Route as MainPasswordBookRouteImport } from './routes/_main/password-book'
+import { Route as MainSettingsRouteImport } from './routes/_main/settings'
+import { Route as OverlayClipboardRouteImport } from './routes/overlay/clipboard'
 
-const IndexRoute = IndexRouteImport.update({
+const MainRoute = MainRouteImport.update({
+  id: '/_main',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MainIndexRoute = MainIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => MainRoute,
 } as any)
-const DiffRoute = DiffRouteImport.update({
+const MainDiffRoute = MainDiffRouteImport.update({
   id: '/diff',
   path: '/diff',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => MainRoute,
 } as any)
-const EncodingRoute = EncodingRouteImport.update({
+const MainEncodingRoute = MainEncodingRouteImport.update({
   id: '/encoding',
   path: '/encoding',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => MainRoute,
 } as any)
-const JsonRoute = JsonRouteImport.update({
+const MainJsonRoute = MainJsonRouteImport.update({
   id: '/json',
   path: '/json',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => MainRoute,
 } as any)
-const PasswordBookRoute = PasswordBookRouteImport.update({
+const MainPasswordBookRoute = MainPasswordBookRouteImport.update({
   id: '/password-book',
   path: '/password-book',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => MainRoute,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
+const MainSettingsRoute = MainSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => MainRoute,
+} as any)
+const OverlayClipboardRoute = OverlayClipboardRouteImport.update({
+  id: '/overlay/clipboard',
+  path: '/overlay/clipboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/diff': typeof DiffRoute
-  '/encoding': typeof EncodingRoute
-  '/json': typeof JsonRoute
-  '/password-book': typeof PasswordBookRoute
-  '/settings': typeof SettingsRoute
+  '/': typeof MainIndexRoute
+  '/diff': typeof MainDiffRoute
+  '/encoding': typeof MainEncodingRoute
+  '/json': typeof MainJsonRoute
+  '/password-book': typeof MainPasswordBookRoute
+  '/settings': typeof MainSettingsRoute
+  '/overlay/clipboard': typeof OverlayClipboardRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/diff': typeof DiffRoute
-  '/encoding': typeof EncodingRoute
-  '/json': typeof JsonRoute
-  '/password-book': typeof PasswordBookRoute
-  '/settings': typeof SettingsRoute
+  '/diff': typeof MainDiffRoute
+  '/encoding': typeof MainEncodingRoute
+  '/json': typeof MainJsonRoute
+  '/password-book': typeof MainPasswordBookRoute
+  '/settings': typeof MainSettingsRoute
+  '/overlay/clipboard': typeof OverlayClipboardRoute
+  '/': typeof MainIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/diff': typeof DiffRoute
-  '/encoding': typeof EncodingRoute
-  '/json': typeof JsonRoute
-  '/password-book': typeof PasswordBookRoute
-  '/settings': typeof SettingsRoute
+  '/_main': typeof MainRouteWithChildren
+  '/_main/diff': typeof MainDiffRoute
+  '/_main/encoding': typeof MainEncodingRoute
+  '/_main/json': typeof MainJsonRoute
+  '/_main/password-book': typeof MainPasswordBookRoute
+  '/_main/settings': typeof MainSettingsRoute
+  '/overlay/clipboard': typeof OverlayClipboardRoute
+  '/_main/': typeof MainIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/diff' | '/encoding' | '/json' | '/password-book' | '/settings'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/diff' | '/encoding' | '/json' | '/password-book' | '/settings'
-  id:
-    | '__root__'
     | '/'
     | '/diff'
     | '/encoding'
     | '/json'
     | '/password-book'
     | '/settings'
+    | '/overlay/clipboard'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/diff'
+    | '/encoding'
+    | '/json'
+    | '/password-book'
+    | '/settings'
+    | '/overlay/clipboard'
+    | '/'
+  id:
+    | '__root__'
+    | '/_main'
+    | '/_main/diff'
+    | '/_main/encoding'
+    | '/_main/json'
+    | '/_main/password-book'
+    | '/_main/settings'
+    | '/overlay/clipboard'
+    | '/_main/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  DiffRoute: typeof DiffRoute
-  EncodingRoute: typeof EncodingRoute
-  JsonRoute: typeof JsonRoute
-  PasswordBookRoute: typeof PasswordBookRoute
-  SettingsRoute: typeof SettingsRoute
+  MainRoute: typeof MainRouteWithChildren
+  OverlayClipboardRoute: typeof OverlayClipboardRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_main': {
+      id: '/_main'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof MainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_main/': {
+      id: '/_main/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof MainIndexRouteImport
+      parentRoute: typeof MainRoute
     }
-    '/diff': {
-      id: '/diff'
+    '/_main/diff': {
+      id: '/_main/diff'
       path: '/diff'
       fullPath: '/diff'
-      preLoaderRoute: typeof DiffRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof MainDiffRouteImport
+      parentRoute: typeof MainRoute
     }
-    '/encoding': {
-      id: '/encoding'
+    '/_main/encoding': {
+      id: '/_main/encoding'
       path: '/encoding'
       fullPath: '/encoding'
-      preLoaderRoute: typeof EncodingRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof MainEncodingRouteImport
+      parentRoute: typeof MainRoute
     }
-    '/json': {
-      id: '/json'
+    '/_main/json': {
+      id: '/_main/json'
       path: '/json'
       fullPath: '/json'
-      preLoaderRoute: typeof JsonRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof MainJsonRouteImport
+      parentRoute: typeof MainRoute
     }
-    '/password-book': {
-      id: '/password-book'
+    '/_main/password-book': {
+      id: '/_main/password-book'
       path: '/password-book'
       fullPath: '/password-book'
-      preLoaderRoute: typeof PasswordBookRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof MainPasswordBookRouteImport
+      parentRoute: typeof MainRoute
     }
-    '/settings': {
-      id: '/settings'
+    '/_main/settings': {
+      id: '/_main/settings'
       path: '/settings'
       fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
+      preLoaderRoute: typeof MainSettingsRouteImport
+      parentRoute: typeof MainRoute
+    }
+    '/overlay/clipboard': {
+      id: '/overlay/clipboard'
+      path: '/overlay/clipboard'
+      fullPath: '/overlay/clipboard'
+      preLoaderRoute: typeof OverlayClipboardRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
 }
 
+interface MainRouteChildren {
+  MainDiffRoute: typeof MainDiffRoute
+  MainEncodingRoute: typeof MainEncodingRoute
+  MainJsonRoute: typeof MainJsonRoute
+  MainPasswordBookRoute: typeof MainPasswordBookRoute
+  MainSettingsRoute: typeof MainSettingsRoute
+  MainIndexRoute: typeof MainIndexRoute
+}
+
+const MainRouteChildren: MainRouteChildren = {
+  MainDiffRoute: MainDiffRoute,
+  MainEncodingRoute: MainEncodingRoute,
+  MainJsonRoute: MainJsonRoute,
+  MainPasswordBookRoute: MainPasswordBookRoute,
+  MainSettingsRoute: MainSettingsRoute,
+  MainIndexRoute: MainIndexRoute,
+}
+
+const MainRouteWithChildren = MainRoute._addFileChildren(MainRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  DiffRoute: DiffRoute,
-  EncodingRoute: EncodingRoute,
-  JsonRoute: JsonRoute,
-  PasswordBookRoute: PasswordBookRoute,
-  SettingsRoute: SettingsRoute,
+  MainRoute: MainRouteWithChildren,
+  OverlayClipboardRoute: OverlayClipboardRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

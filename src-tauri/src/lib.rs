@@ -1,5 +1,6 @@
 pub mod clipboard;
 pub mod db;
+pub mod overlay;
 pub mod platform;
 
 #[cfg(test)]
@@ -12,6 +13,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
+use tauri_plugin_global_shortcut::{GlobalShortcutExt as _, Shortcut, ShortcutState};
 
 use clipboard::commands::ClipboardState;
 use clipboard::engine::ClipboardEngine;
@@ -19,6 +21,9 @@ use clipboard::repository::ClipboardHistoryRepository;
 use platform::{ClipboardAccess, ClipboardWatcher};
 
 const MAIN_WINDOW_LABEL: &str = "main";
+const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
+/// spec 默认 Win+V；改键属 ticket 12。需先在 Windows 设置中关闭系统剪贴板历史。
+const CLIPBOARD_OVERLAY_HOTKEY: &str = "super+v";
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
@@ -94,8 +99,30 @@ fn setup_clipboard(app: &tauri::App) {
     }
 }
 
+fn setup_clipboard_overlay(app: &tauri::App, hotkey: Shortcut) {
+    if let Err(e) = overlay::create(
+        app.app_handle(),
+        CLIPBOARD_OVERLAY_LABEL,
+        "/overlay/clipboard",
+        "Youmi 剪贴板",
+    ) {
+        eprintln!("youmi: 剪贴板浮层窗口创建失败: {e}");
+        return;
+    }
+    // Win+V 被系统剪贴板历史占用时注册失败：仅降级日志，设置页有引导（spec Further Notes）
+    if let Err(e) = app.global_shortcut().register(hotkey) {
+        eprintln!(
+            "youmi: 注册 {CLIPBOARD_OVERLAY_HOTKEY} 失败（系统剪贴板历史占用？请在 Windows 设置中关闭）: {e}"
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let clipboard_hotkey: Shortcut = CLIPBOARD_OVERLAY_HOTKEY
+        .parse()
+        .expect("内置快捷键字符串合法");
+
     tauri::Builder::default()
         // single-instance 必须最先注册：二次启动立即退出，并把唤起意图交给已有实例
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -106,6 +133,17 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(move |app, shortcut, event| {
+                    if event.state == ShortcutState::Pressed && *shortcut == clipboard_hotkey {
+                        if let Err(e) = overlay::toggle(app, CLIPBOARD_OVERLAY_LABEL) {
+                            eprintln!("youmi: 呼出剪贴板浮层失败: {e}");
+                        }
+                    }
+                })
+                .build(),
+        )
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 // 主窗口关闭按钮 = 隐藏到托盘，进程与托盘保持存活；真正退出走托盘菜单。
@@ -116,9 +154,10 @@ pub fn run() {
                 }
             }
         })
-        .setup(|app| {
+        .setup(move |app| {
             setup_tray(app)?;
             setup_clipboard(app);
+            setup_clipboard_overlay(app, clipboard_hotkey);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

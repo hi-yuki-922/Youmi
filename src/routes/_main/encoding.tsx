@@ -18,7 +18,7 @@ import {
   type QueryParam,
 } from "@/tools/encoding/core";
 
-export const Route = createFileRoute("/encoding")({
+export const Route = createFileRoute("/_main/encoding")({
   component: EncodingToolPage,
 });
 

@@ -14,8 +14,13 @@ async function getSetting<T>(key: string, fallback: T): Promise<T> {
 }
 
 async function setSetting<T>(key: string, value: T): Promise<void> {
-  await (await settingsStore()).set(key, value);
+  // 显式 save：auto-save 在多 webview reload/资源关闭时序下不保证落盘（实测）
+  const store = await settingsStore();
+  await store.set(key, value);
+  await store.save();
 }
+
+export { getSetting, setSetting };
 
 const AUTOSTART_ENABLED_KEY = "autostart.enabled";
 

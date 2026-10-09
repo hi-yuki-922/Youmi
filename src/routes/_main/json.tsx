@@ -21,7 +21,7 @@ import {
   type JsonIndent,
 } from "@/tools/json/core";
 
-export const Route = createFileRoute("/json")({
+export const Route = createFileRoute("/_main/json")({
   component: JsonToolPage,
 });
 

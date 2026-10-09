@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 
-export const Route = createFileRoute("/diff")({
+export const Route = createFileRoute("/_main/diff")({
   component: DiffToolPage,
 });
 

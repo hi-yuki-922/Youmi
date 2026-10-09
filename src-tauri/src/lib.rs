@@ -1,8 +1,19 @@
+pub mod clipboard;
+pub mod db;
+pub mod platform;
+
+use std::sync::Arc;
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
+
+use clipboard::commands::ClipboardState;
+use clipboard::engine::ClipboardEngine;
+use clipboard::repository::ClipboardHistoryRepository;
+use platform::{ClipboardAccess, ClipboardWatcher};
 
 const MAIN_WINDOW_LABEL: &str = "main";
 
@@ -47,6 +58,39 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// 剪贴板引擎初始化：数据库 + engine + 监听线程。失败仅日志降级，不阻塞应用启动。
+fn setup_clipboard(app: &tauri::App) {
+    let init = || -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = app.path().app_data_dir()?.join("youmi.db");
+        if let Some(dir) = db_path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let repo = Arc::new(ClipboardHistoryRepository::open(&db_path)?);
+        let access: Arc<dyn ClipboardAccess> = Arc::new(platform::WinClipboardAccess);
+        let engine = Arc::new(ClipboardEngine::new(Arc::clone(&repo), access));
+
+        app.manage(ClipboardState {
+            engine: Arc::clone(&engine),
+            repo,
+        });
+
+        let watcher = platform::WinClipboardWatcher;
+        std::thread::Builder::new()
+            .name("clipboard-watch".into())
+            .spawn(move || {
+                // handle_change 内部自带降级，监听线程错误只在退出时打日志
+                if let Err(e) = watcher.watch(Box::new(move || engine.handle_change())) {
+                    eprintln!("youmi: 剪贴板监听线程退出: {e}");
+                }
+            })?;
+        Ok(())
+    };
+
+    if let Err(e) = init() {
+        eprintln!("youmi: 剪贴板引擎初始化失败（历史不可用）: {e}");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -69,7 +113,20 @@ pub fn run() {
                 }
             }
         })
-        .setup(setup_tray)
+        .setup(|app| {
+            setup_tray(app)?;
+            setup_clipboard(app);
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            clipboard::commands::clipboard_query,
+            clipboard::commands::clipboard_get_image,
+            clipboard::commands::clipboard_delete,
+            clipboard::commands::clipboard_clear,
+            clipboard::commands::clipboard_set_capacity,
+            clipboard::commands::clipboard_write_own_text,
+            clipboard::commands::clipboard_write_own_image_png,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

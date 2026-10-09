@@ -68,8 +68,13 @@ impl ClipboardHistoryRepository {
         self.capacity.load(Ordering::Relaxed)
     }
 
-    pub fn set_capacity(&self, capacity: usize) {
+    /// 调整容量并立即按新容量淘汰（缩容即刻生效，不等下次捕获）。
+    /// 容量 0 语义为"不再保留任何条目"（下次捕获即清空）；调用方（command 层）
+    /// 应约束到合理区间。
+    pub fn set_capacity(&self, capacity: usize) -> rusqlite::Result<()> {
         self.capacity.store(capacity, Ordering::Relaxed);
+        let conn = self.conn.lock().unwrap();
+        evict(&conn, capacity).map(|_| ())
     }
 
     /// 入库或刷新重复条目到顶，然后按容量淘汰最旧。返回条目 id。
@@ -94,12 +99,7 @@ impl ClipboardHistoryRepository {
             params![kind, hash, text, image_png, now],
             |row| row.get(0),
         )?;
-        tx.execute(
-            "DELETE FROM clipboard_history WHERE recency NOT IN (
-                 SELECT recency FROM clipboard_history ORDER BY recency DESC LIMIT ?1
-             )",
-            params![self.capacity.load(Ordering::Relaxed) as i64],
-        )?;
+        evict(&tx, self.capacity.load(Ordering::Relaxed))?;
         tx.commit()?;
         Ok(id)
     }
@@ -119,8 +119,9 @@ impl ClipboardHistoryRepository {
             escaped.push('%');
             escaped
         });
+        // 0 = 不限制；UI 默认值由 command 层持有，repository 不藏第二套默认
         let limit: i64 = if query.limit == 0 {
-            DEFAULT_CAPACITY as i64
+            -1
         } else {
             i64::from(query.limit)
         };
@@ -178,18 +179,27 @@ impl ClipboardHistoryRepository {
 }
 
 fn map_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<ClipboardEntry> {
-    let kind_str: String = row.get(1)?;
+    let kind: ClipboardKind = row.get::<_, String>(1)?.parse().map_err(|e: String| {
+        rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Text, e.into())
+    })?;
     Ok(ClipboardEntry {
         id: row.get(0)?,
-        kind: match kind_str.as_str() {
-            "text" => ClipboardKind::Text,
-            _ => ClipboardKind::Image,
-        },
+        kind,
         text: row.get(2)?,
         has_image: row.get(3)?,
         created_at: row.get(4)?,
         updated_at: row.get(5)?,
     })
+}
+
+/// 淘汰 recency 不在 top-`capacity` 的条目（capture 事务内与 set_capacity 共用）。
+fn evict(conn: &Connection, capacity: usize) -> rusqlite::Result<usize> {
+    conn.execute(
+        "DELETE FROM clipboard_history WHERE recency NOT IN (
+             SELECT recency FROM clipboard_history ORDER BY recency DESC LIMIT ?1
+         )",
+        params![capacity as i64],
+    )
 }
 
 fn now_ms() -> i64 {
@@ -202,6 +212,7 @@ fn now_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempDir;
 
     fn repo() -> ClipboardHistoryRepository {
         ClipboardHistoryRepository::open_in_memory().unwrap()
@@ -309,7 +320,7 @@ mod tests {
     #[test]
     fn capacity_evicts_oldest_beyond_limit() {
         let repo = repo();
-        repo.set_capacity(3);
+        repo.set_capacity(3).unwrap();
         capture_all(&repo, &[text("a"), text("b"), text("c"), text("d")]);
 
         assert_eq!(repo.len().unwrap(), 3);
@@ -319,7 +330,7 @@ mod tests {
     #[test]
     fn refreshed_old_entry_survives_eviction() {
         let repo = repo();
-        repo.set_capacity(3);
+        repo.set_capacity(3).unwrap();
         capture_all(&repo, &[text("a"), text("b"), text("c")]);
         repo.capture(&text("a")).unwrap(); // a 刷新到顶
         capture_all(&repo, &[text("d")]);
@@ -331,10 +342,19 @@ mod tests {
     fn capacity_is_configurable_at_runtime() {
         let repo = repo();
         assert_eq!(repo.capacity(), DEFAULT_CAPACITY);
-        repo.set_capacity(1);
+        repo.set_capacity(1).unwrap();
         capture_all(&repo, &[text("a"), text("b")]);
         assert_eq!(repo.len().unwrap(), 1);
         assert_order(&repo, &["b"]);
+    }
+
+    #[test]
+    fn shrinking_capacity_evicts_immediately() {
+        let repo = repo();
+        capture_all(&repo, &[text("a"), text("b"), text("c")]);
+        repo.set_capacity(1).unwrap();
+        assert_eq!(repo.len().unwrap(), 1);
+        assert_order(&repo, &["c"]); // 只留最新
     }
 
     #[test]
@@ -407,20 +427,12 @@ mod tests {
 
     #[test]
     fn history_persists_across_reopen() {
-        let dir = std::env::temp_dir().join(format!(
-            "youmi-repo-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("clipboard.db");
+        let dir = TempDir::new("repo-test");
+        let path = dir.path().join("clipboard.db");
 
         {
             let repo = ClipboardHistoryRepository::open(&path).unwrap();
-            repo.set_capacity(2);
+            repo.set_capacity(2).unwrap();
             capture_all(&repo, &[text("first"), text("second"), text("third")]);
         }
         {
@@ -428,7 +440,5 @@ mod tests {
             assert_eq!(repo.len().unwrap(), 2); // 容量 2 下的最终状态
             assert_order(&repo, &["third", "second"]);
         }
-
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

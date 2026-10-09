@@ -2,6 +2,9 @@ pub mod clipboard;
 pub mod db;
 pub mod platform;
 
+#[cfg(test)]
+mod test_support;
+
 use std::sync::Arc;
 
 use tauri::{

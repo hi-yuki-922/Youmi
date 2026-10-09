@@ -55,17 +55,19 @@ pub fn clipboard_clear(state: State<'_, ClipboardState>) -> Result<usize, String
     state.repo.clear().map_err(|e| e.to_string())
 }
 
-/// 剪贴板历史容量（条数），超出淘汰最旧。
+/// 剪贴板历史容量（条数），超出淘汰最旧，缩容立即生效。
 #[tauri::command]
 pub fn clipboard_set_capacity(
     state: State<'_, ClipboardState>,
     capacity: u32,
 ) -> Result<(), String> {
-    state.repo.set_capacity(capacity as usize);
-    Ok(())
+    state
+        .repo
+        .set_capacity(capacity.clamp(1, 1_000_000) as usize)
+        .map_err(|e| e.to_string())
 }
 
-/// 自家写入通道（密码复制、取词模拟复制等）：写剪贴板但不进入历史。
+/// 自家写入通道（密码复制、划词模拟复制等）：写剪贴板但不进入历史。
 #[tauri::command]
 pub fn clipboard_write_own_text(
     state: State<'_, ClipboardState>,

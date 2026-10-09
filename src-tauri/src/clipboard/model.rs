@@ -20,6 +20,19 @@ impl ClipboardKind {
     }
 }
 
+/// 数据库里 `kind` 列的反向解析。
+impl std::str::FromStr for ClipboardKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "text" => Ok(ClipboardKind::Text),
+            "image" => Ok(ClipboardKind::Image),
+            other => Err(format!("未知的剪贴板条目类型: {other}")),
+        }
+    }
+}
+
 /// 一次剪贴板内容的载体：平台 seam 读取的结果，也是自家写入通道的写入载荷。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClipboardContent {

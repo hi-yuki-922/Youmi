@@ -44,11 +44,23 @@ pub fn open_in_memory() -> rusqlite::Result<Connection> {
 
 /// 把连接迁移到 `MIGRATIONS` 最新版本。幂等：已是最新则不做任何事。
 pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+    migrate_with(conn, MIGRATIONS)
+}
+
+/// 逐条迁移，每条整体包在一个事务里：中途失败则回滚且 `user_version`
+/// 停在原值，修复后重放从断点继续，不会留下半套 schema。
+fn migrate_with(conn: &Connection, migrations: &[&str]) -> rusqlite::Result<()> {
     let version: u32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-    for (i, sql) in MIGRATIONS.iter().enumerate().skip(version as usize) {
-        conn.execute_batch(sql)?;
-        // PRAGMA 不支持绑定参数；i 来自枚举下标，无注入风险。
-        conn.execute_batch(&format!("PRAGMA user_version = {};", i + 1))?;
+    for (i, sql) in migrations.iter().enumerate().skip(version as usize) {
+        // PRAGMA user_version 可在事务内设置并随事务回滚；i 来自枚举下标，无注入风险。
+        if let Err(e) = conn.execute_batch(&format!(
+            "BEGIN; {sql} PRAGMA user_version = {}; COMMIT;",
+            i + 1
+        )) {
+            // execute_batch 失败不会自动回滚已执行的 BEGIN，需清理遗留的打开事务
+            let _ = conn.execute_batch("ROLLBACK;");
+            return Err(e);
+        }
     }
     Ok(())
 }
@@ -56,6 +68,7 @@ pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempDir;
 
     #[test]
     fn fresh_database_migrates_to_latest() {
@@ -99,16 +112,8 @@ mod tests {
 
     #[test]
     fn open_reuses_existing_schema_without_error() {
-        let dir = std::env::temp_dir().join(format!(
-            "youmi-db-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("test.db");
+        let dir = TempDir::new("db-test");
+        let path = dir.path().join("test.db");
 
         {
             let conn = open(&path).unwrap();
@@ -128,7 +133,38 @@ mod tests {
                 .unwrap();
             assert_eq!(count, 1);
         }
+    }
 
-        std::fs::remove_dir_all(&dir).unwrap();
+    #[test]
+    fn failed_migration_rolls_back_and_resumes_from_breakpoint() {
+        let conn = Connection::open_in_memory().unwrap();
+        // V1 成功、V2 非法：V1 应已提交（带版本号），V2 回滚
+        let broken = &[V1_CLIPBOARD_HISTORY, "CREATE TABLE broken ( derp;"];
+        assert!(migrate_with(&conn, broken).is_err());
+
+        let version: u32 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 1);
+        conn.execute(
+            "INSERT INTO clipboard_history (kind, content_hash, text, created_at, updated_at, recency)
+             VALUES ('text', x'0506', 'kept', 1, 1, 1)",
+            [],
+        )
+        .unwrap();
+
+        // 修复 V2 后重放：从断点继续，已有数据不受影响
+        let fixed = &[V1_CLIPBOARD_HISTORY, "CREATE TABLE v2_table (id INTEGER);"];
+        migrate_with(&conn, fixed).unwrap();
+        let version: u32 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 2);
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM clipboard_history", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 1);
     }
 }

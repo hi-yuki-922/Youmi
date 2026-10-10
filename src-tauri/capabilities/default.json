@@ -3,13 +3,5 @@
   "identifier": "default",
   "description": "Capability for the main window and overlay windows",
   "windows": ["main", "clipboard-overlay"],
-  "permissions": [
-    "core:default",
-    "core:window:allow-start-dragging",
-    "core:window:allow-minimize",
-    "core:window:allow-toggle-maximize",
-    "core:window:allow-close",
-    "store:default",
-    "autostart:default"
-  ]
+  "permissions": ["core:default", "store:default", "autostart:default"]
 }

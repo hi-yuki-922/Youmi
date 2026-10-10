@@ -17,7 +17,7 @@ function MainLayout() {
 
   return (
     // 双卡片嵌套（ADR-0004）：窗口背景层（surface-base）承载标题栏与侧边导航，
-    // 主内容区是浅一档的卡片（surface-raised）叠于其上，四周留出背景层的边。
+    // 主内容区是浅一档的卡片（surface-raised）叠于其上，左右下三方留出背景层的边。
     <div className="flex h-screen flex-col overflow-hidden bg-surface-base">
       <TitleBar />
       <div className="flex min-h-0 flex-1">

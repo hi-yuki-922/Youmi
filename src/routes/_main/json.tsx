@@ -107,7 +107,7 @@ function JsonToolPage() {
         <div
           className={
             status.kind === "success"
-              ? "rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400"
+              ? "rounded-md bg-success/10 px-3 py-2 text-sm text-success"
               : "rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
           }
         >

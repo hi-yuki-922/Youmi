@@ -8,12 +8,12 @@
 
 函数式风格：
 
-- 函数以箭头函数定义：`const fn = () => {}`。非必要不用 `function` 声明。仅当语言/工具行为强制时豁免（如需要 declaration merging、依赖声明提升），并就地说明理由。
+- 函数以箭头函数定义：`const fn = () => {}`。非必要不用 `function` 声明。仅当语言/工具行为强制时豁免（如需要 declaration merging、模块顶层必须先引用后声明），并就地说明理由。
 - 非必要不封装 class。用纯函数 + 数据变换表达逻辑；React 一律函数组件。
 - `this` 严禁使用，除非特定场景必须用：扩展以 class 为中心的内置/第三方类型（如继承 `Error`）、回调 API 约定由调用方绑定 `this` 时，或仅在类型位置的 polymorphic `this`。当前代码库没有这类场景；出现时必须就地说明为什么不可避。
 
 ```tsx
-// 正例：箭头函数 + 显式返回类型
+// 正例：箭头函数
 const formatJson = (input: string, indent: JsonIndent): JsonResult<string> => { ... };
 
 // 反例：无必要理由的 function 声明
@@ -40,7 +40,7 @@ class JsonFormatter {
 
 - TS：行内用 `//`，公开 API 的意图性说明用 JSDoc；Rust：模块说明用 `//!`，公开项的 doc comment 用 `///`，行内用 `//`。
 - 实事求是描述代码现状：写这段代码是什么、受什么约束、为什么这样写（取舍、坑、前提）。不写它从哪里来、被谁要求、经历过什么改动——那些属于 issue tracker，不随代码走。
-- **不含 ticket/spec 上下文**：不引用 ticket 编号、spec 条目编号、"按 XX 的要求"。
+- **不含 ticket/spec 上下文**：不引用 ticket 编号、spec 条目编号、"按 XX 的要求"。ADR 引用不在此限——ADR 是仓库内的长期架构文档，不是进度上下文。
 
 ```rust
 // 反例：引用 spec 条目，读代码的人得不到容量语义本身

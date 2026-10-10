@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   escapeToJsonString,
   formatJson,
@@ -105,11 +106,12 @@ function JsonToolPage() {
 
       {status.kind !== "idle" && (
         <div
-          className={
+          className={cn(
+            "rounded-md px-3 py-2 text-sm",
             status.kind === "success"
-              ? "rounded-md bg-success/10 px-3 py-2 text-sm text-success"
-              : "rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          }
+              ? "bg-success/10 text-success"
+              : "bg-destructive/10 text-destructive",
+          )}
         >
           {status.kind === "error" && status.line !== undefined && status.column !== undefined
             ? `第 ${status.line} 行第 ${status.column} 列：${status.text}`

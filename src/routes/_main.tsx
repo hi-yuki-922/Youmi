@@ -2,6 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { Sidebar } from "@/components/layout/sidebar";
+import { TitleBar } from "@/components/layout/titlebar";
 import { applyClipboardCapacity } from "@/lib/clipboard";
 
 export const Route = createFileRoute("/_main")({
@@ -15,11 +16,18 @@ function MainLayout() {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+    // 双卡片嵌套（ADR-0004）：窗口背景层（surface-base）承载标题栏与侧边导航，
+    // 主内容区是浅一档的卡片（surface-raised）叠于其上，四周留出背景层的边。
+    <div className="flex h-screen flex-col overflow-hidden bg-surface-base">
+      <TitleBar />
+      <div className="flex min-h-0 flex-1">
+        <Sidebar />
+        <main className="min-w-0 flex-1 px-2 pb-2">
+          <div className="h-full overflow-y-auto rounded-lg border bg-card shadow-xs">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

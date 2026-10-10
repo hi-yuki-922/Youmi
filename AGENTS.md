@@ -2,6 +2,10 @@
 
 Windows 桌面端工具集合（Tauri 2 + React）。
 
+## Style guide
+
+编码风格基准见 `docs/style-guide.md`，是 ticket 实现与 code review 的 Standards 依据。
+
 ## Agent skills
 
 ### Issue tracker

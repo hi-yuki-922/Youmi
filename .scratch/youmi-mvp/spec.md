@@ -8,7 +8,7 @@ Status: ready-for-agent
 
 ## Solution
 
-Youmi——常驻系统托盘的 Windows 桌面应用（保留未来迁移 macOS 的可能）。**主窗口**以侧边栏导航承载四个**工作台工具**：编码转换、JSON 工具、文本 diff、密码本。三个**全局工具**通过全局快捷键以**浮层窗口**随时呼出：剪贴板管理（`Win+V`）、命令面板（`Win+Alt+Space`）、划词翻译（`Alt+T`）。
+Youmi——常驻系统托盘的 Windows 桌面应用（保留未来迁移 macOS 的可能）。**主窗口**以侧边栏导航承载四个**工作台工具**：编码转换、JSON 工具、文本 diff、密码本。三个**全局工具**通过全局快捷键以**浮层窗口**随时呼出：剪贴板管理（`Alt+V`）、命令面板（`Win+Alt+Space`）、划词翻译（`Alt+T`）。
 
 ## User Stories
 
@@ -44,7 +44,7 @@ Youmi——常驻系统托盘的 Windows 桌面应用（保留未来迁移 macOS
 ### 剪贴板管理
 
 18. As a user, I want 应用自动捕获我复制的文本和图片, so that 历史无需手动维护。
-19. As a user, I want 按 Win+V 呼出剪贴板浮层浏览历史, so that 替代系统剪贴板历史。
+19. As a user, I want 按 Alt+V 呼出剪贴板浮层浏览历史, so that 替代系统剪贴板历史。
 20. As a user, I want 在浮层中选中条目后回帖到上一个聚焦的窗口, so that 完成粘贴。
 21. As a user, I want 在浮层中按关键词搜索历史, so that 快速找到早前复制的内容。
 22. As a user, I want 按文本/图片分类查看历史, so that 图片多时不受文本干扰。
@@ -84,7 +84,7 @@ Youmi——常驻系统托盘的 Windows 桌面应用（保留未来迁移 macOS
 
 ### 架构
 
-- Tauri 2 单 app、两类窗口：主窗口（工作台工具路由页）+ 浮层窗口（全局工具）。系统托盘常驻，进程不随主窗口关闭退出。
+- Tauri 2 单 app、两类窗口：主窗口（工作台工具路由页，无边框 + 自绘标题栏，ADR-0004）+ 浮层窗口（全局工具）。系统托盘常驻，进程不随主窗口关闭退出。
 - **平台 seam**（ADR-0001）：clipboard-listener、global-hotkey、selection-capture、overlay-position、credential-store 五个 seam，Rust 平台模块隔离，仅实现 Windows，不写 macOS。
 - 前端只经 tauri command 访问 OS 能力与存储。
 
@@ -92,6 +92,7 @@ Youmi——常驻系统托盘的 Windows 桌面应用（保留未来迁移 macOS
 
 - Vite 8 + React 19 + TypeScript；tanstack-router（扁平路由）+ tanstack-query；shadcn-ui + lucide icons。
 - 主窗口 sidebar 导航；UI 中文；主题跟随系统。
+- design token：保留 shadcn 语义变量接口，取值自有——纯中性灰阶、无品牌强调色、暗色跟随系统（ADR-0003）。
 - diff 用 `@pierre/diffs`（React 组件：并排/统一、行级+行内+语法高亮）。
 - AI 用 Vercel AI SDK + openai-compatible provider 指向 DeepSeek（`https://api.deepseek.com`）；provider 设置注入自定义 fetch = `@tauri-apps/plugin-http` 的 fetch（请求走 Rust 网络栈，规避 webview CORS，CSP 不放开外联）；换厂商 = 换 provider 包。
 
@@ -101,7 +102,7 @@ Youmi——常驻系统托盘的 Windows 桌面应用（保留未来迁移 macOS
 - 剪贴板监听：`clipboard-win` 的 Monitor 模块（WM_CLIPBOARDUPDATE），不用官方 clipboard 插件（无监听能力，且有与 Win+V 面板间歇冲突的未决 issue）。
 - 划词取词：`selection` crate 路线（模拟 Ctrl+C + 读剪贴板）；必须保存/恢复用户原剪贴板内容，且自家模拟复制产生的条目不得进入剪贴板历史。
 - 密码本：主密码 + Argon2id 派生密钥 + AES-256-GCM（ADR-0002）；解锁会话明文仅驻内存；复制密码：写入剪贴板但不通知监听器入史，30 秒后自动清除。
-- 插件：global-shortcut（默认 Win+V / Win+Alt+Space / Alt+T，全部可改键+冲突提示）、single-instance（注册为第一个插件，二次启动唤起已有实例）、autostart（默认关）、http（作为 AI SDK 的 fetch 通道）。
+- 插件：global-shortcut（默认 Alt+V / Win+Alt+Space / Alt+T，全部可改键+冲突提示，组合必须至少含一个修饰键）、single-instance（注册为第一个插件，二次启动唤起已有实例）、autostart（默认关）、http（作为 AI SDK 的 fetch 通道）。
 - 凭据存储 seam 用 `keyring` crate（Windows Credential Manager）。
 - 浮层窗口：Tauri 原生配置——`decorations:false`、`alwaysOnTop`、失焦（`onFocusChanged(false)`）即 `hide()`（hide 而非销毁，二次唤起瞬时）、定位到鼠标所在显示器居中。
 
@@ -143,7 +144,7 @@ Greenfield，无既有 seams，新建两层（数量已最少化）：
 ## Further Notes
 
 - **oxfmt 处于 beta**（2026-02 起）：若 beta 问题阻碍日常格式化，回退 prettier，oxlint 保留。
-- **Win+V 前提**：用户需在 Windows 设置中关闭系统剪贴板历史，Win+V 才可被注册；设置页需引导提示，改键可规避。
+- **剪贴板浮层默认 Alt+V**：原默认 Win+V 与 Windows 系统剪贴板历史固定绑定、无法可靠覆盖（2026-10-09 实测注册失败），改默认 Alt+V，设置页引导文案随之更新；改键与冲突提示由 ticket 12 承接。
 - **DeepSeek 模型名已换代**（deepseek-chat/reasoner 已退役，现行 deepseek-flash / deepseek-v4-pro）：模型名必须可配置，默认值在实现时取当时官方文档。
 - 命令面板"启动应用"数据源 = 开始菜单 .lnk 扫描。
-- 本 spec 的 ADRs：ADR-0001（平台 seam）、ADR-0002（密码本加密）。
+- 本 spec 的 ADRs：ADR-0001（平台 seam）、ADR-0002（密码本加密）、ADR-0003（design token 约定）、ADR-0004（无边框主窗口与双卡片布局）。

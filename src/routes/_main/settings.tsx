@@ -168,8 +168,8 @@ function SettingsPage() {
       <SettingsSection title="剪贴板">
         <ClipboardCapacityRow />
         <SettingRow
-          title="Win+V 呼不出浮层？"
-          description="系统剪贴板历史占用了 Win+V：请在 Windows 设置 → 系统 → 剪贴板 中关闭「剪贴板历史」后重启 Youmi"
+          title="呼不出剪贴板浮层？"
+          description="按 Alt+V 呼出/收起剪贴板浮层；无效时通常是 Alt+V 被其他程序占用"
         />
       </SettingsSection>
     </div>

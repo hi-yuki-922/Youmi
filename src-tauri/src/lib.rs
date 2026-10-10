@@ -22,8 +22,8 @@ use platform::{ClipboardAccess, ClipboardWatcher};
 
 const MAIN_WINDOW_LABEL: &str = "main";
 const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
-/// spec 默认 Win+V；改键属 ticket 12。需先在 Windows 设置中关闭系统剪贴板历史。
-const CLIPBOARD_OVERLAY_HOTKEY: &str = "super+v";
+/// 剪贴板浮层呼出/收起的全局快捷键，重启后保持不变。
+const CLIPBOARD_OVERLAY_HOTKEY: &str = "alt+v";
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
@@ -109,11 +109,9 @@ fn setup_clipboard_overlay(app: &tauri::App, hotkey: Shortcut) {
         eprintln!("youmi: 剪贴板浮层窗口创建失败: {e}");
         return;
     }
-    // Win+V 被系统剪贴板历史占用时注册失败：仅降级日志，设置页有引导（spec Further Notes）
+    // 快捷键被其他程序占用时注册失败：仅降级日志，不阻塞应用启动
     if let Err(e) = app.global_shortcut().register(hotkey) {
-        eprintln!(
-            "youmi: 注册 {CLIPBOARD_OVERLAY_HOTKEY} 失败（系统剪贴板历史占用？请在 Windows 设置中关闭）: {e}"
-        );
+        eprintln!("youmi: 注册 {CLIPBOARD_OVERLAY_HOTKEY} 失败（可能被其他程序占用）: {e}");
     }
 }
 

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * 按钮是可点击元素、天然不触发拖拽；关闭按钮发起 close 请求，
  * 由 Rust 端 CloseRequested 统一处理为隐藏到托盘，保持单一语义路径。
  */
-export function TitleBar() {
+export const TitleBar = () => {
   const maximized = useIsMaximized();
   const appWindow = getCurrentWindow();
 
@@ -39,10 +39,10 @@ export function TitleBar() {
       </div>
     </header>
   );
-}
+};
 
 /** 最大化状态驱动按钮图标；拖拽缩放会连续触发 resized，逐次同步即可。 */
-function useIsMaximized() {
+const useIsMaximized = () => {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -61,9 +61,9 @@ function useIsMaximized() {
   }, []);
 
   return maximized;
-}
+};
 
-function WindowButton({
+const WindowButton = ({
   label,
   destructive = false,
   onClick,
@@ -73,7 +73,7 @@ function WindowButton({
   destructive?: boolean;
   onClick: () => void;
   children: ReactNode;
-}) {
+}) => {
   return (
     <button
       type="button"
@@ -88,4 +88,4 @@ function WindowButton({
       {children}
     </button>
   );
-}
+};

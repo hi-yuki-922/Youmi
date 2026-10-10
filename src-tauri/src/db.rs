@@ -1,6 +1,6 @@
 //! SQLite 数据库：连接打开 + migration 机制。
 //!
-//! 剪贴板历史与密码本（ticket 08）密文共用一库；新增 schema 一律在本文件
+//! 剪贴板历史与密码本密文共用一库；新增 schema 一律在本文件
 //! `MIGRATIONS` 末尾追加迁移，禁止改动已有迁移。
 
 use rusqlite::Connection;

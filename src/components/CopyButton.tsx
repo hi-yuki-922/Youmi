@@ -2,19 +2,19 @@ import { type VariantProps } from "class-variance-authority";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/Button";
 
 type CopyButtonProps = {
   text: string;
   disabled?: boolean;
 } & Pick<VariantProps<typeof buttonVariants>, "variant" | "size">;
 
-export function CopyButton({
+export const CopyButton = ({
   text,
   disabled = text === "",
   variant,
   size = "sm",
-}: CopyButtonProps) {
+}: CopyButtonProps) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -30,4 +30,4 @@ export function CopyButton({
       {copied ? "已复制" : "复制结果"}
     </Button>
   );
-}
+};

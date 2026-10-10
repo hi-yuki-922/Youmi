@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /** 工作台页共用的分段式 tab 切换（role=tablist）。 */
-export function SegmentedTabs<T extends string>({
+export const SegmentedTabs = <T extends string>({
   "aria-label": ariaLabel,
   options,
   value,
@@ -13,7 +13,7 @@ export function SegmentedTabs<T extends string>({
   value: T;
   onChange: (value: T) => void;
   className?: string;
-}) {
+}) => {
   return (
     <div
       role="tablist"
@@ -39,4 +39,4 @@ export function SegmentedTabs<T extends string>({
       ))}
     </div>
   );
-}
+};

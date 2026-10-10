@@ -14,17 +14,17 @@ const MAX_DEPTH = 5000;
  * 新版 V8 的 "Unexpected token" 类错误消息不含 position，只能自行扫描。
  * 返回 undefined 表示扫描器认为输入合法（与 JSON.parse 判定矛盾时降级为无位置）。
  */
-function locateSyntaxError(input: string): number | undefined {
+const locateSyntaxError = (input: string): number | undefined => {
   const n = input.length;
   let pos = 0;
   let depth = 0;
 
-  function skipWs() {
+  const skipWs = () => {
     while (pos < n && JSON_WS.includes(input[pos]!)) pos++;
-  }
+  };
 
   /** @returns -1 表示正常结束，否则返回出错 offset */
-  function scanString(): number {
+  const scanString = (): number => {
     // 前置条件：input[pos] === '"'
     pos++;
     for (;;) {
@@ -64,10 +64,10 @@ function locateSyntaxError(input: string): number | undefined {
         pos++;
       }
     }
-  }
+  };
 
   /** @returns -1 表示正常结束，否则返回出错 offset */
-  function scanNumber(): number {
+  const scanNumber = (): number => {
     // 前置条件：input[pos] === '-' 或数字
     if (input[pos] === "-") pos++;
     if (pos >= n) return pos;
@@ -90,18 +90,18 @@ function locateSyntaxError(input: string): number | undefined {
       while (pos < n && /[0-9]/.test(input[pos]!)) pos++;
     }
     return -1;
-  }
+  };
 
-  function scanLiteral(word: string): number {
+  const scanLiteral = (word: string): number => {
     if (input.startsWith(word, pos)) {
       pos += word.length;
       return -1;
     }
     return pos;
-  }
+  };
 
   /** @returns -1 表示正常结束，否则返回出错 offset */
-  function scanValue(): number {
+  const scanValue = (): number => {
     skipWs();
     if (pos >= n) return pos; // 意外结束
     const ch = input[pos]!;
@@ -174,23 +174,23 @@ function locateSyntaxError(input: string): number | undefined {
     if (ch === "n") return scanLiteral("null");
     if (ch === "-" || (ch >= "0" && ch <= "9")) return scanNumber();
     return pos; // 意外 token
-  }
+  };
 
   const r = scanValue();
   if (r !== -1) return r;
   skipWs();
   if (pos < n) return pos; // 顶层值后有多余内容
   return undefined;
-}
+};
 
-function withPosition(input: string, offset: number, message: string): JsonFailure {
+const withPosition = (input: string, offset: number, message: string): JsonFailure => {
   const before = input.slice(0, offset);
   const line = before.split("\n").length;
   const column = offset - before.lastIndexOf("\n");
   return { ok: false, message, line, column };
-}
+};
 
-function toFailure(input: string, error: unknown): JsonFailure {
+const toFailure = (input: string, error: unknown): JsonFailure => {
   const message = error instanceof Error ? error.message : String(error);
   const position = /position (\d+)/.exec(message);
   if (position) {
@@ -199,9 +199,9 @@ function toFailure(input: string, error: unknown): JsonFailure {
   const offset = locateSyntaxError(input);
   if (offset === undefined) return { ok: false, message };
   return withPosition(input, offset, message);
-}
+};
 
-export function formatJson(input: string, indent: JsonIndent): JsonResult<string> {
+export const formatJson = (input: string, indent: JsonIndent): JsonResult<string> => {
   try {
     const value = JSON.parse(input);
     const indentValue = indent === "tab" ? "\t" : indent;
@@ -209,35 +209,33 @@ export function formatJson(input: string, indent: JsonIndent): JsonResult<string
   } catch (error) {
     return toFailure(input, error);
   }
-}
+};
 
-export function minifyJson(input: string): JsonResult<string> {
+export const minifyJson = (input: string): JsonResult<string> => {
   try {
     const value = JSON.parse(input);
     return { ok: true, value: JSON.stringify(value) };
   } catch (error) {
     return toFailure(input, error);
   }
-}
+};
 
 export type JsonValidation = { ok: true } | JsonFailure;
 
-export function validateJson(input: string): JsonValidation {
+export const validateJson = (input: string): JsonValidation => {
   try {
     JSON.parse(input);
     return { ok: true };
   } catch (error) {
     return toFailure(input, error);
   }
-}
+};
 
 /** 任意文本 → 带引号的 JSON 字符串字面量（转义）。恒成功。 */
-export function escapeToJsonString(text: string): string {
-  return JSON.stringify(text);
-}
+export const escapeToJsonString = (text: string): string => JSON.stringify(text);
 
 /** JSON 字符串字面量 → 原文（去转义）。非字符串字面量则报错。 */
-export function unescapeFromJsonString(literal: string): JsonResult<string> {
+export const unescapeFromJsonString = (literal: string): JsonResult<string> => {
   try {
     const value = JSON.parse(literal);
     if (typeof value !== "string") {
@@ -247,4 +245,4 @@ export function unescapeFromJsonString(literal: string): JsonResult<string> {
   } catch (error) {
     return toFailure(literal, error);
   }
-}
+};

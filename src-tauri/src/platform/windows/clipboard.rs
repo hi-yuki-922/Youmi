@@ -1,6 +1,6 @@
 //! clipboard-win 后端：剪贴板读写 + WM_CLIPBOARDUPDATE 监听（ADR-0001 clipboard-listener seam）。
 //!
-//! 平台实现不做单测（spec 测试决策），行为由 `#[ignore]` smoke 测试 + 手动验收覆盖。
+//! 平台实现不做单测：行为由 `#[ignore]` smoke 测试 + 手动验收覆盖。
 
 use clipboard_win::formats;
 use clipboard_win::{get_clipboard, get_clipboard_string, is_format_avail, set_clipboard_string};

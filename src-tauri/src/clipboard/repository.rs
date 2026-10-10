@@ -17,7 +17,7 @@ use serde::Serialize;
 use super::model::{ClipboardContent, ClipboardKind};
 use crate::db;
 
-/// 默认容量（spec story 24）。
+/// 默认容量：超出后按 recency 淘汰最旧条目。
 pub const DEFAULT_CAPACITY: usize = 1000;
 
 /// 查询结果条目：不含图片字节（大对象经 `image_data` 按需取）。

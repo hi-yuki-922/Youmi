@@ -2,11 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
 
-import { CopyButton } from "@/components/copy-button";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { LabeledTextarea } from "@/components/ui/labeled-textarea";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { LabeledTextarea } from "@/components/ui/LabeledTextarea";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import {
   base64ToText,
   dataUriToSvg,
@@ -18,10 +18,6 @@ import {
   type QueryParam,
 } from "@/tools/encoding/core";
 
-export const Route = createFileRoute("/_main/encoding")({
-  component: EncodingToolPage,
-});
-
 const SUB_TOOLS = [
   { id: "svg-url", label: "SVG ↔ URL 编码" },
   { id: "base64", label: "文本 ↔ Base64" },
@@ -30,7 +26,7 @@ const SUB_TOOLS = [
 
 type SubToolId = (typeof SUB_TOOLS)[number]["id"];
 
-function EncodingToolPage() {
+const EncodingToolPage = () => {
   const [active, setActive] = useState<SubToolId>("svg-url");
 
   return (
@@ -68,20 +64,20 @@ function EncodingToolPage() {
       {active === "query" && <QueryTableTool />}
     </div>
   );
-}
+};
 
-function ErrorStrip({ message }: { message: string | null }) {
+const ErrorStrip = ({ message }: { message: string | null }) => {
   if (!message) return null;
   return (
     <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{message}</div>
   );
-}
+};
 
 /**
  * 双栏即时转换器：编辑任意一侧，另一侧立即更新。
  * 左 → 右恒成功；右 → 左可能失败，失败时保留左栏旧值并显示错误条。
  */
-function InstantConverter({
+const InstantConverter = ({
   hint,
   leftLabel,
   leftPlaceholder,
@@ -97,7 +93,7 @@ function InstantConverter({
   rightPlaceholder: string;
   toRight: (value: string) => string;
   toLeft: (value: string) => ConvertResult<string>;
-}) {
+}) => {
   const [left, setLeft] = useState("");
   const [right, setRight] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -141,11 +137,11 @@ function InstantConverter({
       </div>
     </section>
   );
-}
+};
 
 type QueryRow = QueryParam & { id: string };
 
-function QueryTableTool() {
+const QueryTableTool = () => {
   const [rows, setRows] = useState<QueryRow[]>([]);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -239,4 +235,8 @@ function QueryTableTool() {
       </div>
     </section>
   );
-}
+};
+
+export const Route = createFileRoute("/_main/encoding")({
+  component: EncodingToolPage,
+});

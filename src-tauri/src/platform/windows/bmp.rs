@@ -1,7 +1,7 @@
 //! BMP 与 PNG 互转。
 //!
 //! clipboard-win 的 `Bitmap` 格式读写字节 = 带BITMAPFILEHEADER 的 BMP 文件。
-//! 图片入库统一为 PNG（spec：图片以 PNG blob 存储），回写剪贴板再转回 BMP。
+//! 图片入库统一为 PNG，回写剪贴板时再转回 BMP。
 //!
 //! 注意：32bpp BI_RGB 的第 4 字节按 Windows 语义是保留位（未定义），解码端按
 //! 不透明处理——因此经剪贴板 roundtrip 的图片不带 alpha，RGB 像素无损。

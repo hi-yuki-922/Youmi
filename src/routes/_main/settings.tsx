@@ -2,25 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import * as autostart from "@tauri-apps/plugin-autostart";
 
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/Input";
+import { Switch } from "@/components/ui/Switch";
 import { getClipboardCapacity, setClipboardCapacity } from "@/lib/clipboard";
 import { getAutostartPreference, setAutostartPreference } from "@/lib/settings";
 
-export const Route = createFileRoute("/_main/settings")({
-  component: SettingsPage,
-});
+const SettingsSection = ({ title, children }: { title: string; children: ReactNode }) => (
+  <section className="flex flex-col gap-2">
+    <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
+    <div className="divide-y rounded-lg border bg-card">{children}</div>
+  </section>
+);
 
-function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
-      <div className="divide-y rounded-lg border bg-card">{children}</div>
-    </section>
-  );
-}
-
-function SettingRow({
+const SettingRow = ({
   title,
   description,
   control,
@@ -28,7 +22,7 @@ function SettingRow({
   title: string;
   description?: string;
   control?: ReactNode;
-}) {
+}) => {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="flex flex-col gap-0.5">
@@ -38,9 +32,9 @@ function SettingRow({
       {control}
     </div>
   );
-}
+};
 
-function AutostartRow() {
+const AutostartRow = () => {
   const [enabled, setEnabled] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -93,10 +87,10 @@ function AutostartRow() {
       }
     />
   );
-}
+};
 
 /** 容量输入失焦/回车才提交；以引擎 clamp 后的值回显，非法输入恢复原值。 */
-function ClipboardCapacityRow() {
+const ClipboardCapacityRow = () => {
   const [value, setValue] = useState("");
   const [committed, setCommitted] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
@@ -156,9 +150,9 @@ function ClipboardCapacityRow() {
       }
     />
   );
-}
+};
 
-function SettingsPage() {
+const SettingsPage = () => {
   return (
     <div className="flex h-full flex-col gap-4 p-6">
       <h1 className="text-xl font-semibold">设置</h1>
@@ -174,4 +168,8 @@ function SettingsPage() {
       </SettingsSection>
     </div>
   );
-}
+};
+
+export const Route = createFileRoute("/_main/settings")({
+  component: SettingsPage,
+});

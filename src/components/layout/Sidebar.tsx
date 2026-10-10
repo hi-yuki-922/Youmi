@@ -10,7 +10,7 @@ const NAV_ITEMS = [
 ] as const;
 
 // 侧边导航置于窗口背景层（ADR-0004）：不铺卡片底色，与内容卡片靠层次区分。
-export function Sidebar() {
+export const Sidebar = () => {
   return (
     <aside className="flex h-full w-52 shrink-0 flex-col">
       <nav className="flex flex-1 flex-col gap-1 px-2 pt-3">
@@ -31,4 +31,4 @@ export function Sidebar() {
       </nav>
     </aside>
   );
-}
+};

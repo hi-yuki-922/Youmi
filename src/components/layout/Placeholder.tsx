@@ -1,6 +1,6 @@
 import { Construction } from "lucide-react";
 
-export function ToolPlaceholder({ title, description }: { title: string; description: string }) {
+export const ToolPlaceholder = ({ title, description }: { title: string; description: string }) => {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-muted-foreground">
       <Construction className="size-10" />
@@ -8,4 +8,4 @@ export function ToolPlaceholder({ title, description }: { title: string; descrip
       <p className="text-sm">{description}</p>
     </div>
   );
-}
+};

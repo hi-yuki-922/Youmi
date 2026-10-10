@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { CopyButton } from "@/components/copy-button";
-import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/CopyButton";
+import { Button } from "@/components/ui/Button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
 import {
   escapeToJsonString,
@@ -22,20 +22,19 @@ import {
   type JsonIndent,
 } from "@/tools/json/core";
 
-export const Route = createFileRoute("/_main/json")({
-  component: JsonToolPage,
-});
-
 type Status =
   | { kind: "idle" }
   | { kind: "success"; text: string }
   | { kind: "error"; text: string; line?: number; column?: number };
 
-function failureToStatus(failure: JsonFailure): Status {
-  return { kind: "error", text: failure.message, line: failure.line, column: failure.column };
-}
+const failureToStatus = (failure: JsonFailure): Status => ({
+  kind: "error",
+  text: failure.message,
+  line: failure.line,
+  column: failure.column,
+});
 
-function JsonToolPage() {
+const JsonToolPage = () => {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [indent, setIndent] = useState<JsonIndent>(2);
@@ -149,4 +148,8 @@ function JsonToolPage() {
       </div>
     </div>
   );
-}
+};
+
+export const Route = createFileRoute("/_main/json")({
+  component: JsonToolPage,
+});

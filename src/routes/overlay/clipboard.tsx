@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Image as ImageIcon, Search, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 
-import { Input } from "@/components/ui/input";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { Input } from "@/components/ui/Input";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import {
   deleteClipboardEntry,
   getClipboardImage,
@@ -13,10 +13,6 @@ import {
   type ClipboardKind,
 } from "@/lib/clipboard";
 import { formatEntryTime } from "@/tools/clipboard/core";
-
-export const Route = createFileRoute("/overlay/clipboard")({
-  component: ClipboardOverlay,
-});
 
 type KindFilter = "all" | ClipboardKind;
 
@@ -29,7 +25,7 @@ const KIND_FILTER_OPTIONS: ReadonlyArray<{ id: KindFilter; label: string }> = [
   { id: "image", label: "图片" },
 ];
 
-function ClipboardOverlay() {
+const ClipboardOverlay = () => {
   const [keyword, setKeyword] = useState("");
   const deferredKeyword = useDeferredValue(keyword);
   const [kind, setKind] = useState<KindFilter>("all");
@@ -112,9 +108,9 @@ function ClipboardOverlay() {
       )}
     </div>
   );
-}
+};
 
-function EmptyState({ keyword, kind }: { keyword: string; kind: KindFilter }) {
+const EmptyState = ({ keyword, kind }: { keyword: string; kind: KindFilter }) => {
   let message = "暂无剪贴板历史，复制的内容会自动出现在这里";
   if (keyword) {
     message = `没有匹配「${keyword}」的条目`;
@@ -124,9 +120,9 @@ function EmptyState({ keyword, kind }: { keyword: string; kind: KindFilter }) {
     message = "暂无图片条目";
   }
   return <p className="p-4 text-muted-foreground">{message}</p>;
-}
+};
 
-function EntryRow({ entry, onDelete }: { entry: ClipboardEntry; onDelete: () => void }) {
+const EntryRow = ({ entry, onDelete }: { entry: ClipboardEntry; onDelete: () => void }) => {
   return (
     <li className="group flex items-center gap-3 border-b px-4 py-2.5 last:border-b-0 hover:bg-accent/50">
       <div className="min-w-0 flex-1">
@@ -149,10 +145,10 @@ function EntryRow({ entry, onDelete }: { entry: ClipboardEntry; onDelete: () => 
       </button>
     </li>
   );
-}
+};
 
 /** 图片缩略图：updatedAt 进 queryKey——id 可能被 SQLite 复用，同 id 同 updatedAt 才视为同图。 */
-function ImageThumb({ id, updatedAt }: { id: number; updatedAt: number }) {
+const ImageThumb = ({ id, updatedAt }: { id: number; updatedAt: number }) => {
   const { data } = useQuery({
     queryKey: ["clipboard-image", id, updatedAt],
     queryFn: () => getClipboardImage(id),
@@ -173,4 +169,8 @@ function ImageThumb({ id, updatedAt }: { id: number; updatedAt: number }) {
       className="max-h-16 max-w-40 rounded border object-contain"
     />
   );
-}
+};
+
+export const Route = createFileRoute("/overlay/clipboard")({
+  component: ClipboardOverlay,
+});

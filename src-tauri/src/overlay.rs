@@ -1,5 +1,5 @@
-//! 浮层窗口模式（spec 实现决策）：无边框、置顶、失焦即隐（hide 不销毁）、
-//! 定位到鼠标所在显示器居中。剪贴板（06）确立，命令面板（09）、划词翻译（11）复用。
+//! 浮层窗口模式：无边框、置顶、失焦即隐（hide 不销毁）、定位到鼠标所在显示器
+//! 居中。剪贴板浮层、命令面板、划词翻译共用此实现。
 
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WindowEvent,

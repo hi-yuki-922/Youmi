@@ -20,36 +20,31 @@ const CLIPBOARD_CAPACITY_KEY = "clipboard.capacity";
 const CLIPBOARD_CAPACITY_MAX = 1_000_000;
 
 /** 持久化设置中的历史容量；未设置过时返回默认值。 */
-export function getClipboardCapacity(): Promise<number> {
-  return getSetting(CLIPBOARD_CAPACITY_KEY, CLIPBOARD_CAPACITY_DEFAULT);
-}
+export const getClipboardCapacity = (): Promise<number> =>
+  getSetting(CLIPBOARD_CAPACITY_KEY, CLIPBOARD_CAPACITY_DEFAULT);
 
 /** 修改历史容量并立即生效（引擎即时淘汰），同时持久化。 */
-export async function setClipboardCapacity(capacity: number): Promise<void> {
+export const setClipboardCapacity = async (capacity: number): Promise<void> => {
   const clamped = Math.min(Math.max(Math.floor(capacity), 1), CLIPBOARD_CAPACITY_MAX);
   await invoke("clipboard_set_capacity", { capacity: clamped });
   await setSetting(CLIPBOARD_CAPACITY_KEY, clamped);
-}
+};
 
 /** 启动时把持久化容量应用到引擎（幂等，不回写设置）。 */
-export async function applyClipboardCapacity(): Promise<void> {
+export const applyClipboardCapacity = async (): Promise<void> => {
   const capacity = await getClipboardCapacity();
   await invoke("clipboard_set_capacity", { capacity });
-}
+};
 
-export function queryClipboardEntries(params: {
+export const queryClipboardEntries = (params: {
   keyword?: string;
   kind?: ClipboardKind;
   limit?: number;
-}): Promise<ClipboardEntry[]> {
-  return invoke<ClipboardEntry[]>("clipboard_query", params);
-}
+}): Promise<ClipboardEntry[]> => invoke<ClipboardEntry[]>("clipboard_query", params);
 
 /** 条目图片的 PNG base64；文本条目或已删除返回 null。 */
-export function getClipboardImage(id: number): Promise<string | null> {
-  return invoke<string | null>("clipboard_get_image", { id });
-}
+export const getClipboardImage = (id: number): Promise<string | null> =>
+  invoke<string | null>("clipboard_get_image", { id });
 
-export function deleteClipboardEntry(id: number): Promise<boolean> {
-  return invoke<boolean>("clipboard_delete", { id });
-}
+export const deleteClipboardEntry = (id: number): Promise<boolean> =>
+  invoke<boolean>("clipboard_delete", { id });

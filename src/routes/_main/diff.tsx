@@ -3,19 +3,15 @@ import { FileDiff } from "@pierre/diffs/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useMemo, useState } from "react";
 
-import { LabeledTextarea } from "@/components/ui/labeled-textarea";
+import { LabeledTextarea } from "@/components/ui/LabeledTextarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
-
-export const Route = createFileRoute("/_main/diff")({
-  component: DiffToolPage,
-});
+} from "@/components/ui/Select";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
 const VIEW_OPTIONS = [
   { id: "split", label: "并排" },
@@ -47,11 +43,10 @@ const LANGUAGES = [
 type LanguageId = (typeof LANGUAGES)[number]["value"];
 
 /** 纯文本不指定 lang，交给库按文件名推断；其余语言显式指定。 */
-function toFileContents(name: string, contents: string, lang: LanguageId): FileContents {
-  return lang === "text" ? { name, contents } : { name, contents, lang };
-}
+const toFileContents = (name: string, contents: string, lang: LanguageId): FileContents =>
+  lang === "text" ? { name, contents } : { name, contents, lang };
 
-function DiffToolPage() {
+const DiffToolPage = () => {
   const [view, setView] = useState<ViewId>("split");
   const [lang, setLang] = useState<LanguageId>("text");
   const [oldText, setOldText] = useState("");
@@ -136,4 +131,8 @@ function DiffToolPage() {
       )}
     </div>
   );
-}
+};
+
+export const Route = createFileRoute("/_main/diff")({
+  component: DiffToolPage,
+});

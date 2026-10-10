@@ -1,20 +1,20 @@
 import * as React from "react";
 import { useId } from "react";
 
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
 
 /**
  * 带标签的等宽多行文本面板：工作台工具双栏布局的输入/结果区。
  * `action` 渲染在标签行右侧（如复制按钮）。
  */
-function LabeledTextarea({
+const LabeledTextarea = ({
   label,
   action,
   className,
   id,
   ...props
-}: React.ComponentProps<"textarea"> & { label: string; action?: React.ReactNode }) {
+}: React.ComponentProps<"textarea"> & { label: string; action?: React.ReactNode }) => {
   const autoId = useId();
   const textareaId = id ?? autoId;
 
@@ -34,6 +34,6 @@ function LabeledTextarea({
       />
     </div>
   );
-}
+};
 
 export { LabeledTextarea };

@@ -1,3 +1,4 @@
+pub mod apps;
 pub mod clipboard;
 pub mod db;
 pub mod overlay;
@@ -132,6 +133,13 @@ fn setup_clipboard_overlay(app: &tauri::App, hotkey: Shortcut) {
     }
 }
 
+/// 应用索引：后台线程首扫开始菜单，不阻塞启动；呼起面板时按需刷新。
+fn setup_apps(app: &tauri::App) {
+    let state = apps::AppsState::default();
+    apps::ensure_fresh(&state);
+    app.manage(state);
+}
+
 fn setup_palette_overlay(app: &tauri::App, hotkey: Shortcut) {
     if let Err(e) = overlay::create(
         app.app_handle(),
@@ -200,6 +208,7 @@ pub fn run() {
         .setup(move |app| {
             setup_tray(app)?;
             setup_clipboard(app);
+            setup_apps(app);
             setup_clipboard_overlay(app, clipboard_hotkey);
             setup_palette_overlay(app, palette_hotkey);
             Ok(())
@@ -214,6 +223,8 @@ pub fn run() {
             clipboard::commands::clipboard_write_own_image_png,
             clipboard::commands::clipboard_pasteback,
             palette::palette_open_tool,
+            apps::apps_query,
+            apps::apps_launch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

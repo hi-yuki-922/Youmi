@@ -7,6 +7,8 @@
 pub mod windows;
 
 #[cfg(windows)]
+pub use windows::apps::launch_lnk;
+#[cfg(windows)]
 pub use windows::clipboard::{WinClipboardAccess, WinClipboardWatcher};
 #[cfg(windows)]
 pub use windows::pasteback::WinPastebackAccess;

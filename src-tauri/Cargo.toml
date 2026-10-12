@@ -28,7 +28,9 @@ serde_json = "1"
 clipboard-win = { version = "5.4.1", features = ["monitor"] }
 windows = { version = "0.62", features = [
     "Win32_Foundation",
+    "Win32_System_Com",
     "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }

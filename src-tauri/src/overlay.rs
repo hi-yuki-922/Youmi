@@ -1,21 +1,29 @@
 //! 浮层窗口模式：无边框、置顶、失焦即隐（hide 不销毁）、定位到鼠标所在显示器
-//! 居中。剪贴板浮层使用；命令面板、划词翻译设计为复用同一实现。
+//! 居中。剪贴板浮层与命令面板使用；划词翻译设计为复用同一实现。
 
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WindowEvent,
 };
 
-/// 浮层统一尺寸（逻辑像素）。
-const OVERLAY_WIDTH: f64 = 720.0;
-const OVERLAY_HEIGHT: f64 = 560.0;
+/// 浮层逻辑尺寸（逻辑像素宽高）。
+pub struct OverlaySize {
+    pub width: f64,
+    pub height: f64,
+}
 
-/// 创建一个隐藏的浮层窗口并挂上失焦即隐。
+/// 创建一个隐藏的浮层窗口并挂上失焦即隐。`size` 为逻辑像素宽高。
 /// 窗口以 hide 代替销毁，保证再次呼起瞬时。
 ///
 /// 注意：WebView2 要求同一 user data folder 的所有 webview 使用完全一致的
 /// browser args（实测：只给主窗口加 additionalBrowserArgs 会让隐藏的浮层
 /// 创建报 0x8007139F INVALID_STATE）；新增浮层窗口保持默认参数即可。
-pub fn create(app: &AppHandle, label: &str, path: &str, title: &str) -> tauri::Result<()> {
+pub fn create(
+    app: &AppHandle,
+    label: &str,
+    path: &str,
+    title: &str,
+    size: OverlaySize,
+) -> tauri::Result<()> {
     let window = tauri::WebviewWindowBuilder::new(app, label, WebviewUrl::App(path.into()))
         .title(title)
         .decorations(false)
@@ -23,7 +31,7 @@ pub fn create(app: &AppHandle, label: &str, path: &str, title: &str) -> tauri::R
         .skip_taskbar(true)
         .resizable(false)
         .visible(false)
-        .inner_size(OVERLAY_WIDTH, OVERLAY_HEIGHT)
+        .inner_size(size.width, size.height)
         .build()?;
 
     let owner = app.clone();

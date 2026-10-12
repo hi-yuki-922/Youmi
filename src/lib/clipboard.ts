@@ -49,6 +49,10 @@ export const getClipboardImage = (id: number): Promise<string | null> =>
 export const deleteClipboardEntry = (id: number): Promise<boolean> =>
   invoke<boolean>("clipboard_delete", { id });
 
+/** Youmi 自家写文本剪贴板：引擎 pending 标记保证不入历史。 */
+export const writeOwnClipboardText = (text: string): Promise<void> =>
+  invoke<void>("clipboard_write_own_text", { text });
+
 /** 回帖结果（Rust `PastebackOutcome` kebab-case 序列化）。 */
 export type PastebackOutcome = "pasted" | "copied-only";
 

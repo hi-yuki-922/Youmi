@@ -17,6 +17,7 @@ import { Route as MainJsonRouteImport } from './routes/_main/json'
 import { Route as MainPasswordBookRouteImport } from './routes/_main/password-book'
 import { Route as MainSettingsRouteImport } from './routes/_main/settings'
 import { Route as OverlayClipboardRouteImport } from './routes/overlay/clipboard'
+import { Route as OverlayPaletteRouteImport } from './routes/overlay/palette'
 
 const MainRoute = MainRouteImport.update({
   id: '/_main',
@@ -57,6 +58,11 @@ const OverlayClipboardRoute = OverlayClipboardRouteImport.update({
   path: '/overlay/clipboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OverlayPaletteRoute = OverlayPaletteRouteImport.update({
+  id: '/overlay/palette',
+  path: '/overlay/palette',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof MainIndexRoute
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/password-book': typeof MainPasswordBookRoute
   '/settings': typeof MainSettingsRoute
   '/overlay/clipboard': typeof OverlayClipboardRoute
+  '/overlay/palette': typeof OverlayPaletteRoute
 }
 export interface FileRoutesByTo {
   '/diff': typeof MainDiffRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/password-book': typeof MainPasswordBookRoute
   '/settings': typeof MainSettingsRoute
   '/overlay/clipboard': typeof OverlayClipboardRoute
+  '/overlay/palette': typeof OverlayPaletteRoute
   '/': typeof MainIndexRoute
 }
 export interface FileRoutesById {
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/_main/password-book': typeof MainPasswordBookRoute
   '/_main/settings': typeof MainSettingsRoute
   '/overlay/clipboard': typeof OverlayClipboardRoute
+  '/overlay/palette': typeof OverlayPaletteRoute
   '/_main/': typeof MainIndexRoute
 }
 export interface FileRouteTypes {
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/password-book'
     | '/settings'
     | '/overlay/clipboard'
+    | '/overlay/palette'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/diff'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/password-book'
     | '/settings'
     | '/overlay/clipboard'
+    | '/overlay/palette'
     | '/'
   id:
     | '__root__'
@@ -115,12 +126,14 @@ export interface FileRouteTypes {
     | '/_main/password-book'
     | '/_main/settings'
     | '/overlay/clipboard'
+    | '/overlay/palette'
     | '/_main/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   MainRoute: typeof MainRouteWithChildren
   OverlayClipboardRoute: typeof OverlayClipboardRoute
+  OverlayPaletteRoute: typeof OverlayPaletteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OverlayClipboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/overlay/palette': {
+      id: '/overlay/palette'
+      path: '/overlay/palette'
+      fullPath: '/overlay/palette'
+      preLoaderRoute: typeof OverlayPaletteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -207,6 +227,7 @@ const MainRouteWithChildren = MainRoute._addFileChildren(MainRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   MainRoute: MainRouteWithChildren,
   OverlayClipboardRoute: OverlayClipboardRoute,
+  OverlayPaletteRoute: OverlayPaletteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

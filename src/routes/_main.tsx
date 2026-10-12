@@ -4,11 +4,26 @@ import { useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { applyClipboardCapacity } from "@/lib/clipboard";
+import { onOpenTool } from "@/lib/palette";
+import { TOOLS } from "@/lib/tools";
+import { router } from "@/Router";
 
 const MainLayout = () => {
   useEffect(() => {
     // 启动即把持久化的历史容量应用到引擎：容量生效不依赖用户访问设置页
     void applyClipboardCapacity();
+  }, []);
+
+  useEffect(() => {
+    // 命令面板直达：主窗口隐藏时 webview 仍存活、监听有效，收到工具 id 即切路由；
+    // 显示与聚焦由 Rust 侧 palette_open_tool 完成
+    const unlisten = onOpenTool((toolId) => {
+      const tool = TOOLS.find((entry) => entry.id === toolId);
+      if (tool) void router.navigate({ to: tool.path });
+    });
+    return () => {
+      void unlisten.then((off) => off());
+    };
   }, []);
 
   return (

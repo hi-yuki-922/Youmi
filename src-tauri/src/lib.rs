@@ -1,6 +1,7 @@
 pub mod clipboard;
 pub mod db;
 pub mod overlay;
+pub mod palette;
 pub mod platform;
 
 #[cfg(test)]
@@ -19,14 +20,27 @@ use clipboard::commands::ClipboardState;
 use clipboard::engine::ClipboardEngine;
 use clipboard::pasteback::PastebackState;
 use clipboard::repository::ClipboardHistoryRepository;
+use overlay::OverlaySize;
 use platform::{ClipboardAccess, ClipboardWatcher};
 
-const MAIN_WINDOW_LABEL: &str = "main";
+pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
 pub(crate) const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
 /// 剪贴板浮层呼出/收起的全局快捷键，重启后保持不变。
 const CLIPBOARD_OVERLAY_HOTKEY: &str = "alt+v";
+/// 剪贴板浮层尺寸（逻辑像素）。
+const CLIPBOARD_OVERLAY_SIZE: OverlaySize = OverlaySize {
+    width: 720.0,
+    height: 560.0,
+};
+/// 命令面板呼出/收起的全局快捷键，重启后保持不变。
+const PALETTE_HOTKEY: &str = "super+alt+space";
+/// 命令面板尺寸（逻辑像素）：单输入框 + 条目列表的轻量形态，比剪贴板浮层小。
+const PALETTE_SIZE: OverlaySize = OverlaySize {
+    width: 640.0,
+    height: 420.0,
+};
 
-fn show_main_window(app: &tauri::AppHandle) {
+pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
         let _ = window.unminimize();
         let _ = window.show();
@@ -107,6 +121,7 @@ fn setup_clipboard_overlay(app: &tauri::App, hotkey: Shortcut) {
         CLIPBOARD_OVERLAY_LABEL,
         "/overlay/clipboard",
         "Youmi 剪贴板",
+        CLIPBOARD_OVERLAY_SIZE,
     ) {
         eprintln!("youmi: 剪贴板浮层窗口创建失败: {e}");
         return;
@@ -117,11 +132,29 @@ fn setup_clipboard_overlay(app: &tauri::App, hotkey: Shortcut) {
     }
 }
 
+fn setup_palette_overlay(app: &tauri::App, hotkey: Shortcut) {
+    if let Err(e) = overlay::create(
+        app.app_handle(),
+        palette::LABEL,
+        "/overlay/palette",
+        "Youmi 命令面板",
+        PALETTE_SIZE,
+    ) {
+        eprintln!("youmi: 命令面板浮层窗口创建失败: {e}");
+        return;
+    }
+    // 快捷键被其他程序占用时注册失败：仅降级日志，不阻塞应用启动
+    if let Err(e) = app.global_shortcut().register(hotkey) {
+        eprintln!("youmi: 注册 {PALETTE_HOTKEY} 失败（可能被其他程序占用）: {e}");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let clipboard_hotkey: Shortcut = CLIPBOARD_OVERLAY_HOTKEY
         .parse()
         .expect("内置快捷键字符串合法");
+    let palette_hotkey: Shortcut = PALETTE_HOTKEY.parse().expect("内置快捷键字符串合法");
 
     tauri::Builder::default()
         // single-instance 必须最先注册：二次启动立即退出，并把唤起意图交给已有实例
@@ -136,12 +169,19 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
-                    if event.state == ShortcutState::Pressed && *shortcut == clipboard_hotkey {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+                    if *shortcut == clipboard_hotkey {
                         // 呼起前捕获前台窗口为回帖目标；
                         // 收起分支（浮层自己在前台）捕获结果为无目标，恰好清掉过期目标
                         clipboard::pasteback::capture_current_target(app);
                         if let Err(e) = overlay::toggle(app, CLIPBOARD_OVERLAY_LABEL) {
                             eprintln!("youmi: 呼出剪贴板浮层失败: {e}");
+                        }
+                    } else if *shortcut == palette_hotkey {
+                        if let Err(e) = overlay::toggle(app, palette::LABEL) {
+                            eprintln!("youmi: 呼出命令面板失败: {e}");
                         }
                     }
                 })
@@ -161,6 +201,7 @@ pub fn run() {
             setup_tray(app)?;
             setup_clipboard(app);
             setup_clipboard_overlay(app, clipboard_hotkey);
+            setup_palette_overlay(app, palette_hotkey);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -172,6 +213,7 @@ pub fn run() {
             clipboard::commands::clipboard_write_own_text,
             clipboard::commands::clipboard_write_own_image_png,
             clipboard::commands::clipboard_pasteback,
+            palette::palette_open_tool,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

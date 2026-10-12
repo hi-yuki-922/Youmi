@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window and overlay windows",
-  "windows": ["main", "clipboard-overlay"],
-  "permissions": ["core:default", "store:default", "autostart:default"]
+  "windows": ["main", "clipboard-overlay", "palette-overlay"],
+  "permissions": ["core:default", "store:default", "autostart:default", "core:window:allow-hide"]
 }

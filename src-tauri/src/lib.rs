@@ -17,11 +17,12 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt as _, Shortcut, ShortcutSta
 
 use clipboard::commands::ClipboardState;
 use clipboard::engine::ClipboardEngine;
+use clipboard::pasteback::PastebackState;
 use clipboard::repository::ClipboardHistoryRepository;
 use platform::{ClipboardAccess, ClipboardWatcher};
 
 const MAIN_WINDOW_LABEL: &str = "main";
-const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
+pub(crate) const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
 /// 剪贴板浮层呼出/收起的全局快捷键，重启后保持不变。
 const CLIPBOARD_OVERLAY_HOTKEY: &str = "alt+v";
 
@@ -81,6 +82,7 @@ fn setup_clipboard(app: &tauri::App) {
             engine: Arc::clone(&engine),
             repo,
         });
+        app.manage(PastebackState::new(Arc::new(platform::WinPastebackAccess)));
 
         let watcher = platform::WinClipboardWatcher;
         std::thread::Builder::new()
@@ -135,6 +137,9 @@ pub fn run() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
                     if event.state == ShortcutState::Pressed && *shortcut == clipboard_hotkey {
+                        // 呼起前捕获前台窗口为回帖目标；
+                        // 收起分支（浮层自己在前台）捕获结果为无目标，恰好清掉过期目标
+                        clipboard::pasteback::capture_current_target(app);
                         if let Err(e) = overlay::toggle(app, CLIPBOARD_OVERLAY_LABEL) {
                             eprintln!("youmi: 呼出剪贴板浮层失败: {e}");
                         }
@@ -166,6 +171,7 @@ pub fn run() {
             clipboard::commands::clipboard_set_capacity,
             clipboard::commands::clipboard_write_own_text,
             clipboard::commands::clipboard_write_own_image_png,
+            clipboard::commands::clipboard_pasteback,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

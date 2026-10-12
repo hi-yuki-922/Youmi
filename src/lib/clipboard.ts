@@ -48,3 +48,11 @@ export const getClipboardImage = (id: number): Promise<string | null> =>
 
 export const deleteClipboardEntry = (id: number): Promise<boolean> =>
   invoke<boolean>("clipboard_delete", { id });
+
+/** 回帖结果（Rust `PastebackOutcome` kebab-case 序列化）。 */
+export type PastebackOutcome = "pasted" | "copied-only";
+
+/** 回帖：条目写剪贴板（不入史）→ 焦点交还呼出浮层前的窗口 → 模拟 Ctrl+V。
+ * `copied-only` = 无有效目标或焦点/键击失败，条目留在剪贴板供手动粘贴。 */
+export const pastebackClipboardEntry = (id: number): Promise<PastebackOutcome> =>
+  invoke<PastebackOutcome>("clipboard_pasteback", { id });

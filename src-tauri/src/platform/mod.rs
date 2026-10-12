@@ -8,6 +8,8 @@ pub mod windows;
 
 #[cfg(windows)]
 pub use windows::clipboard::{WinClipboardAccess, WinClipboardWatcher};
+#[cfg(windows)]
+pub use windows::pasteback::WinPastebackAccess;
 
 use std::fmt;
 
@@ -46,4 +48,20 @@ pub trait ClipboardWatcher: Send {
     /// 阻塞当前线程监听剪贴板变化，每次变化调用一次 `on_change`。
     /// 必须在专用线程上调用（实现内部依赖线程亲和的消息循环）；返回即监听结束。
     fn watch(&self, on_change: Box<dyn Fn() + Send>) -> Result<(), PlatformError>;
+}
+
+/// 回帖 seam（ADR-0001 模拟输入半边）：前台窗口管理与粘贴键击模拟，
+/// 供剪贴板回帖把条目送回呼出浮层前的窗口。
+pub trait PastebackAccess: Send + Sync {
+    /// 当前前台窗口句柄；取不到时返回 None。
+    fn foreground_window(&self) -> Option<isize>;
+
+    /// 窗口所属进程 ID；窗口已失效返回 None。
+    fn window_process(&self, hwnd: isize) -> Option<u32>;
+
+    /// 把窗口带到前台；返回是否成功。
+    fn set_foreground(&self, hwnd: isize) -> bool;
+
+    /// 向当前前台窗口模拟 Ctrl+V 粘贴键击。
+    fn send_paste(&self) -> Result<(), PlatformError>;
 }

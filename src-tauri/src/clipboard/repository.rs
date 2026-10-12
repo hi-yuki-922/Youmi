@@ -151,6 +151,32 @@ impl ClipboardHistoryRepository {
         .optional()
     }
 
+    /// 取条目的完整内容（回帖用）：文本或图片 PNG 字节；不存在返回 None。
+    pub fn entry_content(&self, id: i64) -> rusqlite::Result<Option<ClipboardContent>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT kind, text, image_png FROM clipboard_history WHERE id = ?1",
+            params![id],
+            |row| {
+                let kind: ClipboardKind =
+                    row.get::<_, String>(0)?.parse().map_err(|e: String| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            0,
+                            rusqlite::types::Type::Text,
+                            e.into(),
+                        )
+                    })?;
+                Ok(match kind {
+                    ClipboardKind::Image => ClipboardContent::ImagePng(row.get(2)?),
+                    ClipboardKind::Text => {
+                        ClipboardContent::Text(row.get::<_, Option<String>>(1)?.unwrap_or_default())
+                    }
+                })
+            },
+        )
+        .optional()
+    }
+
     /// 删除单条；返回是否确有删除。
     pub fn delete(&self, id: i64) -> rusqlite::Result<bool> {
         let conn = self.conn.lock().unwrap();
@@ -398,6 +424,33 @@ mod tests {
             .unwrap();
         assert_eq!(images.len(), 1);
         assert_eq!(images[0].kind, ClipboardKind::Image);
+    }
+
+    #[test]
+    fn entry_content_returns_full_content() {
+        let repo = repo();
+        let blob = vec![5u8, 6, 7];
+        capture_all(&repo, &[text("hello"), png(&blob)]);
+
+        let entries = repo.query(&query(None, None, u32::MAX)).unwrap();
+        let text_entry = entries
+            .iter()
+            .find(|e| e.kind == ClipboardKind::Text)
+            .unwrap();
+        let image_entry = entries
+            .iter()
+            .find(|e| e.kind == ClipboardKind::Image)
+            .unwrap();
+
+        assert_eq!(
+            repo.entry_content(text_entry.id).unwrap(),
+            Some(text("hello"))
+        );
+        assert_eq!(
+            repo.entry_content(image_entry.id).unwrap(),
+            Some(png(&blob))
+        );
+        assert_eq!(repo.entry_content(-1).unwrap(), None);
     }
 
     #[test]

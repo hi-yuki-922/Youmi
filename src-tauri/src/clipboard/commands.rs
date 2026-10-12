@@ -3,10 +3,11 @@
 use std::sync::Arc;
 
 use base64::Engine as _;
-use tauri::State;
+use tauri::{Manager, State};
 
 use super::engine::ClipboardEngine;
 use super::model::ClipboardKind;
+use super::pasteback::{self, PastebackOutcome, PastebackState};
 use super::repository::{ClipboardEntry, ClipboardHistoryRepository, HistoryQuery};
 
 /// 默认单次查询条数。
@@ -85,4 +86,35 @@ pub fn clipboard_write_own_image_png(
         .decode(base64_png)
         .map_err(|e| format!("PNG base64 解码失败: {e}"))?;
     state.engine.write_own_image_png(&png).map_err(|e| e.0)
+}
+
+/// 回帖：条目写剪贴板（自家通道不入史）→ 浮层隐藏、焦点交还呼出浮层前的
+/// 窗口 → 模拟 Ctrl+V → 延迟恢复用户原剪贴板。无有效目标或焦点/键击失败
+/// 时降级为 `copied-only`（条目留在剪贴板供手动粘贴）。
+#[tauri::command]
+pub async fn clipboard_pasteback(
+    app: tauri::AppHandle,
+    state: State<'_, ClipboardState>,
+    pasteback: State<'_, PastebackState>,
+    id: i64,
+) -> Result<PastebackOutcome, String> {
+    let deps = pasteback::PastebackDeps {
+        repo: Arc::clone(&state.repo),
+        engine: Arc::clone(&state.engine),
+        input: Arc::clone(&pasteback.platform),
+        target: *pasteback.target.lock().unwrap(),
+        own_pid: std::process::id(),
+        focus_settle: pasteback::FOCUS_SETTLE,
+        restore_delay: pasteback::RESTORE_DELAY,
+    };
+    // 编排含焦点等待与键击注入，放阻塞线程池，不占 async runtime
+    tauri::async_runtime::spawn_blocking(move || {
+        pasteback::run(&deps, id, &|| {
+            if let Some(window) = app.get_webview_window(crate::CLIPBOARD_OVERLAY_LABEL) {
+                let _ = window.hide();
+            }
+        })
+    })
+    .await
+    .map_err(|e| format!("回帖任务执行失败: {e}"))?
 }

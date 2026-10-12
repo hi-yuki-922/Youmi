@@ -2,3 +2,4 @@
 
 pub mod bmp;
 pub mod clipboard;
+pub mod pasteback;

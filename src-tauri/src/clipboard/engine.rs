@@ -70,7 +70,9 @@ impl ClipboardEngine {
         self.write_own(&ClipboardContent::ImagePng(png.to_vec()))
     }
 
-    fn write_own(&self, content: &ClipboardContent) -> Result<(), PlatformError> {
+    /// 自家写入通道的唯一入口：写内容且不进入剪贴板历史（回帖写条目、
+    /// 恢复用户原剪贴板都走这里）。
+    pub fn write_own(&self, content: &ClipboardContent) -> Result<(), PlatformError> {
         self.self_writes.lock().unwrap().begin();
         let result = match content {
             ClipboardContent::Text(text) => self.access.write_text(text),
@@ -82,6 +84,12 @@ impl ClipboardEngine {
             _ => registry.rollback(), // 写入失败，或平台拿不到序号时放弃过滤
         }
         result
+    }
+
+    /// 底层剪贴板访问：回帖读取用户原剪贴板与序号用（与捕获同源，自家写入
+    /// 过滤才能对上）。
+    pub fn access(&self) -> &Arc<dyn ClipboardAccess> {
+        &self.access
     }
 }
 

@@ -8,6 +8,7 @@ import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import {
   deleteClipboardEntry,
   getClipboardImage,
+  pastebackClipboardEntry,
   queryClipboardEntries,
   type ClipboardEntry,
   type ClipboardKind,
@@ -25,11 +26,21 @@ const KIND_FILTER_OPTIONS: ReadonlyArray<{ id: KindFilter; label: string }> = [
   { id: "image", label: "图片" },
 ];
 
+/** 焦点移到列表中相邻的行（clamp 在首尾）。 */
+const focusSiblingRow = (row: HTMLElement, offset: 1 | -1) => {
+  const rows = row.parentElement?.children;
+  if (!rows) return;
+  const index = Array.prototype.indexOf.call(rows, row) + offset;
+  if (index < 0 || index >= rows.length) return;
+  if (rows[index] instanceof HTMLElement) rows[index].focus();
+};
+
 const ClipboardOverlay = () => {
   const [keyword, setKeyword] = useState("");
   const deferredKeyword = useDeferredValue(keyword);
   const [kind, setKind] = useState<KindFilter>("all");
   const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const entriesQuery = useQuery({
     queryKey: ["clipboard-entries", { keyword: deferredKeyword, kind }],
@@ -67,6 +78,19 @@ const ClipboardOverlay = () => {
     },
   });
 
+  // 回帖不改变历史（Rust 自家写入通道 + 完成后恢复原剪贴板），无需 invalidate；
+  // 浮层由 Rust 侧在回帖流程中隐藏。copied-only 属正常降级，不打扰用户。
+  const pastebackMutation = useMutation({
+    mutationFn: (id: number) => pastebackClipboardEntry(id),
+    onError: (error) => {
+      console.error("回帖失败", error);
+    },
+  });
+
+  const pasteback = (id: number) => {
+    if (!pastebackMutation.isPending) pastebackMutation.mutate(id);
+  };
+
   const entries = entriesQuery.data ?? [];
 
   return (
@@ -78,6 +102,14 @@ const ClipboardOverlay = () => {
             ref={searchRef}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
+            onKeyDown={(e) => {
+              // 方向键下 = 从搜索框进入列表选择
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                const first = listRef.current?.firstElementChild;
+                if (first instanceof HTMLElement) first.focus();
+              }
+            }}
             placeholder="搜索剪贴板历史…"
             className="h-8 pl-8"
           />
@@ -96,16 +128,21 @@ const ClipboardOverlay = () => {
       ) : entries.length === 0 ? (
         <EmptyState keyword={deferredKeyword} kind={kind} />
       ) : (
-        <ul className="flex-1 overflow-y-auto">
+        <ul ref={listRef} className="flex-1 overflow-y-auto">
           {entries.map((entry) => (
             <EntryRow
               key={entry.id}
               entry={entry}
+              onPaste={() => pasteback(entry.id)}
               onDelete={() => deleteMutation.mutate(entry.id)}
             />
           ))}
         </ul>
       )}
+
+      <p className="border-t px-4 py-1.5 text-xs text-muted-foreground">
+        ↑↓ 选择，回车或双击回帖到之前的窗口
+      </p>
     </div>
   );
 };
@@ -122,9 +159,33 @@ const EmptyState = ({ keyword, kind }: { keyword: string; kind: KindFilter }) =>
   return <p className="p-4 text-muted-foreground">{message}</p>;
 };
 
-const EntryRow = ({ entry, onDelete }: { entry: ClipboardEntry; onDelete: () => void }) => {
+const EntryRow = ({
+  entry,
+  onPaste,
+  onDelete,
+}: {
+  entry: ClipboardEntry;
+  onPaste: () => void;
+  onDelete: () => void;
+}) => {
   return (
-    <li className="group flex items-center gap-3 border-b px-4 py-2.5 last:border-b-0 hover:bg-accent/50">
+    <li
+      tabIndex={0}
+      aria-label={entry.kind === "image" ? "图片条目，回车或双击回帖" : `文本条目，回车或双击回帖`}
+      onDoubleClick={onPaste}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          // 焦点在行内删除按钮上时，Enter 仍归按钮（删除），不触发回帖
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          onPaste();
+        } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          focusSiblingRow(e.currentTarget, e.key === "ArrowDown" ? 1 : -1);
+        }
+      }}
+      className="group flex cursor-default items-center gap-3 border-b px-4 py-2.5 last:border-b-0 focus:bg-accent/70 focus:outline-none hover:bg-accent/50"
+    >
       <div className="min-w-0 flex-1">
         {entry.kind === "image" ? (
           <ImageThumb id={entry.id} updatedAt={entry.updatedAt} />
@@ -138,6 +199,7 @@ const EntryRow = ({ entry, onDelete }: { entry: ClipboardEntry; onDelete: () => 
       <button
         type="button"
         onClick={onDelete}
+        onDoubleClick={(e) => e.stopPropagation()}
         aria-label="删除该条目"
         className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
       >

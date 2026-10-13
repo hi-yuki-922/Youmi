@@ -21,7 +21,10 @@ export const getTranslateModel = (): Promise<string> =>
 
 export const setTranslateModel = (model: string): Promise<void> => setSetting(MODEL_KEY, model);
 
-/** 凭据库中的 DeepSeek API key；未配置返回 null。 */
+/** 凭据库中是否已配置 API key（presence 查询，不取回明文）。 */
+export const hasTranslateApiKey = (): Promise<boolean> => invoke<boolean>("translate_has_api_key");
+
+/** 凭据库中的 DeepSeek API key；未配置返回 null。仅翻译发起时取回。 */
 export const getTranslateApiKey = (): Promise<string | null> =>
   invoke<string | null>("translate_get_api_key");
 

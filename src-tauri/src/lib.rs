@@ -278,6 +278,7 @@ pub fn run() {
             apps::apps_query,
             apps::apps_launch,
             overlay::overlay_set_pinned,
+            translate::translate_has_api_key,
             translate::translate_get_api_key,
             translate::translate_set_api_key,
         ])

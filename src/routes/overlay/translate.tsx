@@ -14,11 +14,8 @@ import {
   type TranslateDirection,
 } from "@/tools/translate/core";
 
-/** 取词结果事件载荷（Rust `SelectionEventPayload` camelCase 序列化）。 */
-interface SelectionEventPayload {
-  text: string | null;
-  message: string | null;
-}
+/** 取词结果事件载荷（Rust `SelectionEventPayload` kebab-case tag 序列化）。 */
+type SelectionEventPayload = { kind: "text"; text: string } | { kind: "message"; message: string };
 
 const SELECTION_EVENT = "translate-selection";
 
@@ -80,16 +77,15 @@ const TranslateOverlay = () => {
   // 订阅只挂一次，translate 经 directionRef 读取最新方向，不进依赖。
   useEffect(() => {
     const unlisten = listen<SelectionEventPayload>(SELECTION_EVENT, (event) => {
-      const { text, message } = event.payload;
       stopStream();
       setStreaming(false);
-      if (text !== null && text !== "") {
-        setSource(text);
-        void translate(text, directionRef.current);
+      if (event.payload.kind === "text") {
+        setSource(event.payload.text);
+        void translate(event.payload.text, directionRef.current);
       } else {
         setSource("");
         setOutput("");
-        setError(message ?? "未检测到选中文本");
+        setError(event.payload.message);
       }
     });
     const onKeyDown = (e: KeyboardEvent) => {

@@ -19,13 +19,13 @@ pub const SELECTION_EVENT: &str = "translate-selection";
 /// DeepSeek API key 在凭据库中的条目名。
 const DEEPSEEK_API_KEY: &str = "deepseek-api-key";
 
-/// 取词结果事件载荷。`text` = 取到的选中文本；`message` = 取词失败/无选中
-/// 的说明，二者互斥。
+/// 取词结果事件载荷：`text` = 取到的选中文本；`message` = 取词失败/无选中
+/// 的说明。互斥由类型表达，不发双空/双值载荷。
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SelectionEventPayload {
-    pub text: Option<String>,
-    pub message: Option<String>,
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum SelectionEventPayload {
+    Text { text: String },
+    Message { message: String },
 }
 
 /// 取词依赖：剪贴板引擎（自家写入过滤与恢复）+ 划词取词平台 seam。
@@ -47,9 +47,8 @@ pub fn capture_and_show(app: &AppHandle) {
         // 引擎未初始化的降级：浮层照常呼出并说明原因
         show_with_payload(
             app,
-            &SelectionEventPayload {
-                text: None,
-                message: Some("剪贴板引擎未初始化，划词翻译不可用".into()),
+            &SelectionEventPayload::Message {
+                message: "剪贴板引擎未初始化，划词翻译不可用".into(),
             },
         );
         return;
@@ -74,17 +73,12 @@ pub fn capture_and_show(app: &AppHandle) {
         poll_interval: selection::POLL_INTERVAL,
     };
     let payload = match selection::capture(&deps) {
-        Ok(selection::Selection::Text(text)) => SelectionEventPayload {
-            text: Some(text),
-            message: None,
+        Ok(selection::Selection::Text(text)) => SelectionEventPayload::Text { text },
+        Ok(selection::Selection::Nothing) => SelectionEventPayload::Message {
+            message: "未检测到选中文本".into(),
         },
-        Ok(selection::Selection::Nothing) => SelectionEventPayload {
-            text: None,
-            message: Some("未检测到选中文本".into()),
-        },
-        Err(message) => SelectionEventPayload {
-            text: None,
-            message: Some(format!("取词失败：{message}")),
+        Err(message) => SelectionEventPayload::Message {
+            message: format!("取词失败：{message}"),
         },
     };
     show_with_payload(app, &payload);
@@ -98,6 +92,17 @@ fn show_with_payload(app: &AppHandle, payload: &SelectionEventPayload) {
     if let Err(e) = app.emit_to(LABEL, SELECTION_EVENT, payload) {
         eprintln!("youmi: 发送取词结果事件失败: {e}");
     }
+}
+
+/// 凭据库中是否已配置 API key。设置页展示"已配置"状态用：presence 查询
+/// 不把 key 明文带进 webview，取回明文仅翻译发起时（translate_get_api_key）。
+#[tauri::command]
+pub fn translate_has_api_key(state: State<'_, SecretState>) -> Result<bool, String> {
+    state
+        .store
+        .get(DEEPSEEK_API_KEY)
+        .map(|value| value.is_some())
+        .map_err(|e| e.0)
 }
 
 #[tauri::command]
@@ -126,8 +131,7 @@ mod smoke_tests {
     use crate::platform::{SecretStore as _, WinSecretStore};
 
     /// 真实凭据库 smoke：验证 `deepseek-api-key` 条目经平台 seam 可读（命名
-    /// 与 keyring windows-native 一致）。实机跑前可先用
-    /// `.scratch/youmi-mvp/verify/fake-key.ps1 set <值>` 预置假 key。
+    /// 与 keyring windows-native 一致）。条目不存在时仅打印状态，不算失败。
     #[test]
     #[ignore = "读真实系统凭据库，手动执行：cargo test -- --ignored --test-threads=1"]
     fn deepseek_api_key_entry_is_readable() {

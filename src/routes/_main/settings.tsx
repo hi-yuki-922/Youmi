@@ -9,8 +9,8 @@ import { getClipboardCapacity, setClipboardCapacity } from "@/lib/clipboard";
 import { getAutostartPreference, setAutostartPreference } from "@/lib/settings";
 import {
   DEEPSEEK_DEFAULT_MODEL,
-  getTranslateApiKey,
   getTranslateModel,
+  hasTranslateApiKey,
   setTranslateApiKey,
   setTranslateModel,
 } from "@/lib/translate";
@@ -195,14 +195,14 @@ const DeepSeekApiKeyRow = () => {
 
   useEffect(() => {
     let active = true;
-    void getTranslateApiKey()
-      .then((key) => {
+    void hasTranslateApiKey()
+      .then((exists) => {
         if (!active) return;
-        setConfigured(Boolean(key));
+        setConfigured(exists);
         setReady(true);
       })
       .catch((error) => {
-        console.error("读取 DeepSeek API key 失败", error);
+        console.error("读取 DeepSeek API key 状态失败", error);
         if (active) setReady(true);
       });
     return () => {

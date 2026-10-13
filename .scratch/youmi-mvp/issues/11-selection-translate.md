@@ -4,9 +4,9 @@
 
 **Blocked by:** 04 — 托盘常驻 + 单实例 + 设置页雏形；06 — 剪贴板浮层 v1
 
-**Status:** ready-for-human（2026-10-13，实现完成；GUI 链路实机验收待控制台解锁，见「实机验证」）
+**Status:** done（2026-10-13）
 
-- [ ] 在浏览器/记事本等应用选中文字按 Alt+T：浮层在鼠标附近出现并流式输出译文（实现完成、逻辑经单测与 fake 覆盖；GUI 实跑 + 真实 key 流式 E2E 待人工验收）
+- [x] 在浏览器/记事本等应用选中文字按 Alt+T：浮层在鼠标附近出现并流式输出译文（实机验收通过；取词被残留 Alt 污染的缺陷已修复，见 Comments 末两条）
 - [x] 取词后用户原剪贴板内容被恢复，模拟复制不进入剪贴板历史（单测 + 真实剪贴板/凭据 smoke 覆盖）
 - [x] 翻译方向可切换（自动→中文为默认；源文已是中文时自动方向改译英文；提示词逻辑单测覆盖，浮层内点击待人工验收）
 - [x] 浮层可固定，固定后点击其他区域不关闭（定位/固定逻辑单测覆盖，浮层内点击待人工验收）
@@ -27,3 +27,5 @@
 - 实机验证（Windows，dev 实跑）：① 真实凭据库 smoke 通过；并用 `verify/fake-key.ps1`（CredWrite，命名 `{user}.{service}` 与 keyring windows-native 源码一致）预置假 key 后，`translate::smoke_tests::deepseek_api_key_entry_is_readable` 经 app 同一条目名读回成功——设置页保存 → 取词命令读取的凭据链路成立；② 真实剪贴板 smoke（文本/图片读写回环、监听通知、捕获+自家写入通道 E2E）通过，期间发现 E2E smoke 与运行中的 dev app 争用剪贴板会偶发失败（环境争用，停掉 dev app 后 3/3 稳定），非本次回归；③ GUI 驱动验证（SendKeys Alt+T + 截屏）因当前控制台锁定（无前台窗口、截屏句柄无效）无法执行——驱动脚本已就绪（`verify-translate.ps1` + `translate-target.ps1` + `fake-key.ps1`，控制台解锁后可复跑：无选中提示、假 key 401 错误展示、剪贴板恢复、历史无选中条目四步）。
 - 已知边界：① 真实 API key 的流式译文端到端（AI SDK → tauri http → DeepSeek SSE）与浮层 GUI 行为（光标旁定位、方向切换、固定失焦不隐）留人工验收：解锁后在设置页填入真实 key 跑 `verify-translate.ps1` 即可覆盖；② 取词靠模拟 Ctrl+C，不支持复制的目标（如部分终端只读输出、无选中语义的应用）600ms 超时按"未检测到选中文本"处理；③ 管理员权限窗口作为取词目标时 SendInput 受 UIPI 限制，同样走超时路径；④ 原剪贴板为文件列表等未支持格式时无法恢复（选中文本留在剪贴板）；⑤ 自家窗口聚焦时 Alt+T 为静默 no-op（含主窗口里选中的文字）；⑥ http 插件仅放行 `api.deepseek.com`——未来支持自定义 base URL 需同步扩 capabilities 作用域。
 - review（Standards+Spec 双轴）处置：修复——smoke 注释去掉 tracker 脚本路径引用（注释通则）；事件载荷改 tagged enum（Rust `SelectionEventPayload` 与 TS 可辨识联合对应，互斥进类型）；新增 `translate_has_api_key` presence 查询，设置页不再取回 key 明文（与"值只在发起翻译时取回"一致）；状态/勾选回退为如实的 ready-for-human。保留——固定能力挂在通用浮层失焦 handler 上（CONTEXT"固定浮层"本就是浮层窗口层概念，非翻译专属）；Esc 隐藏浮层与其余浮层一致；自家前台守卫在 mod.rs/selection.rs 各一行、语义不同（静默跳过 vs 无选中），不抽共享；settle/timeout/poll_interval 三元组不再包一层；浮层定位尚未 seam 化属 ADR-0001 既有欠账，未在本次扩大处理。
+- 实机验收缺陷修复（2026-10-13）：用户实机划词后按 Alt+T，Rider/VSCode/记事本/浏览器全部报"未检测到选中文本"。根因：全局快捷键经 RegisterHotKey 在按键按下瞬间投递，取词编排毫秒级即执行到 SendInput，此时用户往往仍按着 Alt——`send_ctrl_chord` 不清理残留修饰键，目标应用收到 Ctrl+Alt+C 而非 Ctrl+C，复制永不发生，600ms 超时按无选中处理。与两处现象吻合：全部应用一致失败（与具体应用无关）、报错浮层能弹出（自家前台守卫是静默 return 不弹浮层，浮层弹出说明编排走完、send_copy 已发出）；UIPI/超时时长/序号轮询假设均与现象不符（记事本未提权且响应为毫秒级、真实剪贴板 smoke 已过）。修复：chord 前按 GetAsyncKeyState 抬起残留的 Alt/Shift/Win，与 chord 合并为一次 SendInput 批（先抬后按）；Ctrl 是 chord 自身组成部分，残留无害不处理；抬起后不回按——回按会让目标应用看到多余的 Alt 按下-抬起（菜单激活类副作用）。回帖 `send_paste` 共用 `send_ctrl_chord` 一并受益。验证：新增 `#[ignore]` 真实键击 smoke `send_ctrl_chord_releases_lingering_alt`（注入 Alt↓ 模拟快捷键触发瞬间 → 调真实 chord → 断言 Alt 已释放，前置不成立时报环境错误不误报），修复前稳定 red、修复后 3/3 green；cargo 76 例 + fmt/clippy 干净。待人工复验：真实应用划词 Alt+T 全链路（含带真实 key 的流式译文）。
+- 复验通过，置 done（2026-10-13）：残留修饰键修复后实机验证通过——Rider/VSCode/记事本/浏览器划词 Alt+T 均正常弹出浮层并流式翻译，剪贴板恢复与不入史行为无异常。

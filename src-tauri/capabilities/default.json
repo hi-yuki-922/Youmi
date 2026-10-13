@@ -2,6 +2,19 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window and overlay windows",
-  "windows": ["main", "clipboard-overlay", "palette-overlay"],
-  "permissions": ["core:default", "store:default", "autostart:default", "core:window:allow-hide"]
+  "windows": ["main", "clipboard-overlay", "palette-overlay", "translate-overlay"],
+  "permissions": [
+    "core:default",
+    "store:default",
+    "autostart:default",
+    "core:window:allow-hide",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://api.deepseek.com/*"
+        }
+      ]
+    }
+  ]
 }

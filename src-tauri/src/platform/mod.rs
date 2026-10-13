@@ -12,6 +12,10 @@ pub use windows::apps::launch_lnk;
 pub use windows::clipboard::{WinClipboardAccess, WinClipboardWatcher};
 #[cfg(windows)]
 pub use windows::pasteback::WinPastebackAccess;
+#[cfg(windows)]
+pub use windows::secrets::WinSecretStore;
+#[cfg(windows)]
+pub use windows::selection::WinSelectionAccess;
 
 use std::fmt;
 
@@ -66,4 +70,27 @@ pub trait PastebackAccess: Send + Sync {
 
     /// 向当前前台窗口模拟 Ctrl+V 粘贴键击。
     fn send_paste(&self) -> Result<(), PlatformError>;
+}
+
+/// 划词取词 seam（ADR-0001）：向前台窗口模拟 Ctrl+C，配合剪贴板读取
+/// 完成取词；剪贴板保存/恢复与历史过滤在业务编排层（不在此 seam 内）。
+pub trait SelectionAccess: Send + Sync {
+    /// 当前前台窗口所属进程 ID；取不到时返回 None。
+    fn foreground_process(&self) -> Option<u32>;
+
+    /// 向当前前台窗口模拟 Ctrl+C 复制键击。
+    fn send_copy(&self) -> Result<(), PlatformError>;
+}
+
+/// 凭据存储 seam（ADR-0001）：系统凭据库（Windows 凭据管理器）的键值存取，
+/// 供 API key 等秘密不落明文文件。
+pub trait SecretStore: Send + Sync {
+    /// 读取秘密；不存在返回 Ok(None)，读取失败返回 Err。
+    fn get(&self, key: &str) -> Result<Option<String>, PlatformError>;
+
+    /// 写入秘密（覆盖已有值）。
+    fn set(&self, key: &str, value: &str) -> Result<(), PlatformError>;
+
+    /// 删除秘密；不存在视为已删除。
+    fn delete(&self, key: &str) -> Result<(), PlatformError>;
 }

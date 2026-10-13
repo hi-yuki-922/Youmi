@@ -4,6 +4,7 @@ pub mod db;
 pub mod overlay;
 pub mod palette;
 pub mod platform;
+pub mod translate;
 
 #[cfg(test)]
 mod test_support;
@@ -23,6 +24,7 @@ use clipboard::pasteback::PastebackState;
 use clipboard::repository::ClipboardHistoryRepository;
 use overlay::OverlaySize;
 use platform::{ClipboardAccess, ClipboardWatcher};
+use translate::SecretState;
 
 pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
 pub(crate) const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
@@ -39,6 +41,13 @@ const PALETTE_HOTKEY: &str = "super+alt+space";
 const PALETTE_SIZE: OverlaySize = OverlaySize {
     width: 640.0,
     height: 420.0,
+};
+/// 划词翻译呼出的全局快捷键，重启后保持不变。
+const TRANSLATE_HOTKEY: &str = "alt+t";
+/// 划词翻译浮层尺寸（逻辑像素）：小浮层贴近光标显示。
+const TRANSLATE_OVERLAY_SIZE: OverlaySize = OverlaySize {
+    width: 460.0,
+    height: 360.0,
 };
 
 pub(crate) fn show_main_window(app: &tauri::AppHandle) {
@@ -157,12 +166,43 @@ fn setup_palette_overlay(app: &tauri::App, hotkey: Shortcut) {
     }
 }
 
+/// 划词翻译：凭据存取独立管理（引擎初始化失败时设置页仍可用）；取词依赖
+/// 剪贴板引擎的自家写入过滤，引擎缺失时热键降级为浮层内提示。
+fn setup_translate_overlay(app: &tauri::App, hotkey: Shortcut) {
+    app.manage(SecretState {
+        store: Arc::new(platform::WinSecretStore),
+    });
+    if let Err(e) = overlay::create(
+        app.app_handle(),
+        translate::LABEL,
+        "/overlay/translate",
+        "Youmi 划词翻译",
+        TRANSLATE_OVERLAY_SIZE,
+    ) {
+        eprintln!("youmi: 划词翻译浮层窗口创建失败: {e}");
+        return;
+    }
+    if let Some(state) = app.try_state::<ClipboardState>() {
+        app.manage(translate::TranslateState {
+            engine: Arc::clone(&state.engine),
+            selection: Arc::new(platform::WinSelectionAccess),
+        });
+    } else {
+        eprintln!("youmi: 剪贴板引擎未初始化，划词取词不可用");
+    }
+    // 快捷键被其他程序占用时注册失败：仅降级日志，不阻塞应用启动
+    if let Err(e) = app.global_shortcut().register(hotkey) {
+        eprintln!("youmi: 注册 {TRANSLATE_HOTKEY} 失败（可能被其他程序占用）: {e}");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let clipboard_hotkey: Shortcut = CLIPBOARD_OVERLAY_HOTKEY
         .parse()
         .expect("内置快捷键字符串合法");
     let palette_hotkey: Shortcut = PALETTE_HOTKEY.parse().expect("内置快捷键字符串合法");
+    let translate_hotkey: Shortcut = TRANSLATE_HOTKEY.parse().expect("内置快捷键字符串合法");
 
     tauri::Builder::default()
         // single-instance 必须最先注册：二次启动立即退出，并把唤起意图交给已有实例
@@ -174,6 +214,8 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        // 翻译请求经前端自定义 fetch 走此插件，绕开 webview 的 CORS 限制
+        .plugin(tauri_plugin_http::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, shortcut, event| {
@@ -191,6 +233,13 @@ pub fn run() {
                         if let Err(e) = overlay::toggle(app, palette::LABEL) {
                             eprintln!("youmi: 呼出命令面板失败: {e}");
                         }
+                    } else if *shortcut == translate_hotkey {
+                        // 取词必须先于显示（Ctrl+C 发给呼起时仍在前台的目标应用），
+                        // 编排含键击注入与轮询等待：放阻塞线程池，不占主线程
+                        let app = app.clone();
+                        tauri::async_runtime::spawn_blocking(move || {
+                            translate::capture_and_show(&app);
+                        });
                     }
                 })
                 .build(),
@@ -206,11 +255,14 @@ pub fn run() {
             }
         })
         .setup(move |app| {
+            // 固定浮层状态先于浮层窗口创建管理：失焦 handler 首次触发就能读到
+            app.manage(overlay::PinnedOverlays::default());
             setup_tray(app)?;
             setup_clipboard(app);
             setup_apps(app);
             setup_clipboard_overlay(app, clipboard_hotkey);
             setup_palette_overlay(app, palette_hotkey);
+            setup_translate_overlay(app, translate_hotkey);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -225,6 +277,9 @@ pub fn run() {
             palette::palette_open_tool,
             apps::apps_query,
             apps::apps_launch,
+            overlay::overlay_set_pinned,
+            translate::translate_get_api_key,
+            translate::translate_set_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

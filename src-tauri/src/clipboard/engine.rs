@@ -86,6 +86,28 @@ impl ClipboardEngine {
         result
     }
 
+    /// 模拟复制过滤窗口的开始：此后到 finish/abort 之间的剪贴板变化先按
+    /// pending 过滤。与 write_own 同一套序号识别，只是写入者是目标应用
+    /// （划词取词里 Ctrl+C 由前台应用代写）。
+    pub fn begin_simulated_copy(&self) {
+        self.self_writes.lock().unwrap().begin();
+    }
+
+    /// 模拟复制完成：以当前序号落账，代写引发的后续变化事件全部过滤；
+    /// 平台拿不到序号时放弃过滤。
+    pub fn finish_simulated_copy(&self) {
+        let mut registry = self.self_writes.lock().unwrap();
+        match self.access.sequence() {
+            Some(sequence) => registry.commit(sequence),
+            None => registry.rollback(),
+        }
+    }
+
+    /// 模拟复制未发生或失败：撤销 pending，后续变化正常入库。
+    pub fn abort_simulated_copy(&self) {
+        self.self_writes.lock().unwrap().rollback();
+    }
+
     /// 底层剪贴板访问：回帖读取用户原剪贴板与序号用（与捕获同源，自家写入
     /// 过滤才能对上）。
     pub fn access(&self) -> &Arc<dyn ClipboardAccess> {
@@ -297,6 +319,51 @@ mod tests {
         engine.write_own_image_png(&[7, 8, 9]).unwrap();
         engine.handle_change();
         assert_eq!(texts(&engine), Vec::<String>::new());
+    }
+
+    #[test]
+    fn simulated_copy_is_excluded_from_history() {
+        let access = FakeAccess::new();
+        let engine = engine(access.clone());
+
+        // 取词流程：begin → 目标应用代写剪贴板 → finish 落账
+        engine.begin_simulated_copy();
+        access.set_content(ClipboardContent::Text("selected".into()));
+        engine.finish_simulated_copy();
+
+        // 代写引发的多个变化事件序号相同，全部被过滤
+        engine.handle_change();
+        engine.handle_change();
+        assert_eq!(texts(&engine), Vec::<String>::new());
+    }
+
+    #[test]
+    fn aborted_simulated_copy_does_not_exclude_later_change() {
+        let access = FakeAccess::new();
+        let engine = engine(access.clone());
+
+        engine.begin_simulated_copy();
+        engine.abort_simulated_copy();
+        access.set_content(ClipboardContent::Text("user copy".into()));
+        engine.handle_change();
+        assert_eq!(texts(&engine), vec!["user copy".to_string()]);
+    }
+
+    #[test]
+    fn user_copy_after_simulated_copy_is_captured() {
+        let access = FakeAccess::new();
+        let engine = engine(access.clone());
+
+        engine.begin_simulated_copy();
+        access.set_content(ClipboardContent::Text("selected".into()));
+        engine.finish_simulated_copy();
+        engine.handle_change();
+        assert_eq!(texts(&engine), Vec::<String>::new());
+
+        // 之后用户复制相同内容：序号已前进，正常入库
+        access.set_content(ClipboardContent::Text("selected".into()));
+        engine.handle_change();
+        assert_eq!(texts(&engine), vec!["selected".to_string()]);
     }
 
     #[test]

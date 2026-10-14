@@ -25,12 +25,34 @@ CREATE UNIQUE INDEX idx_clipboard_history_dedupe ON clipboard_history (kind, con
 CREATE INDEX idx_clipboard_history_recency ON clipboard_history (recency);
 ";
 
+/// 迁移 V2：密码本（ADR-0002）。
+///
+/// - `vault_meta`：单行（id 恒为 1）——Argon2id 盐值 + 主密码校验器（校验器
+///   本身是 AES-GCM 密文，解密成功且明文匹配即主密码正确）
+/// - `vault_entries`：凭据条目，整条载荷（标题/用户名/密码/URL/备注的 JSON）
+///   经 AES-256-GCM 加密后存 `data`，库里不落任何明文
+const V2_VAULT: &str = "
+CREATE TABLE vault_meta (
+    id       INTEGER PRIMARY KEY CHECK (id = 1),
+    salt     BLOB NOT NULL,
+    verifier BLOB NOT NULL
+);
+CREATE TABLE vault_entries (
+    id         INTEGER PRIMARY KEY,
+    data       BLOB NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+";
+
 /// 顺序迁移：`MIGRATIONS[n]` 把 schema 从版本 n 升到 n+1。
-const MIGRATIONS: &[&str] = &[V1_CLIPBOARD_HISTORY];
+const MIGRATIONS: &[&str] = &[V1_CLIPBOARD_HISTORY, V2_VAULT];
 
 /// 打开（必要时创建）数据库文件并迁移到最新版本。
 pub fn open(path: &std::path::Path) -> rusqlite::Result<Connection> {
     let conn = Connection::open(path)?;
+    // 剪贴板历史与密码本各持一个连接共用此库：写冲突等锁而不是立刻报 BUSY
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
     migrate(&conn)?;
     Ok(conn)
 }
@@ -88,6 +110,24 @@ mod tests {
             )
             .unwrap();
         assert_eq!(table, "clipboard_history");
+
+        let vault_meta: String = conn
+            .query_row(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'vault_meta'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(vault_meta, "vault_meta");
+
+        let vault_entries: String = conn
+            .query_row(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'vault_entries'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(vault_entries, "vault_entries");
     }
 
     #[test]

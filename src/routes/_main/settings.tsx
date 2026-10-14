@@ -14,6 +14,7 @@ import {
   setTranslateApiKey,
   setTranslateModel,
 } from "@/lib/translate";
+import { getVaultLockTimeoutMinutes, setVaultLockTimeoutMinutes } from "@/lib/vault";
 
 const SettingsSection = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className="flex flex-col gap-2">
@@ -160,6 +161,69 @@ const ClipboardCapacityRow = () => {
   );
 };
 
+/** 锁定超时输入失焦/回车才提交；以后端 clamp 后的值回显，非法输入恢复原值。 */
+const VaultLockTimeoutRow = () => {
+  const [value, setValue] = useState("");
+  const [committed, setCommitted] = useState<number | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void getVaultLockTimeoutMinutes().then((minutes) => {
+      if (!active) return;
+      setValue(String(minutes));
+      setCommitted(minutes);
+      setReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const commit = async () => {
+    if (!ready) return;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setValue(String(committed));
+      return;
+    }
+    if (parsed === committed) return;
+    try {
+      await setVaultLockTimeoutMinutes(parsed);
+      const applied = await getVaultLockTimeoutMinutes();
+      setCommitted(applied);
+      setValue(String(applied));
+    } catch (error) {
+      console.error("修改密码本锁定超时失败", error);
+      setValue(String(committed));
+    }
+  };
+
+  return (
+    <SettingRow
+      title="锁定超时"
+      description="无操作该时长后自动锁定密码本"
+      control={
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={1}
+            value={value}
+            disabled={!ready}
+            onChange={(e) => setValue(e.target.value)}
+            onBlur={() => void commit()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className="w-24 text-right"
+          />
+          <span className="text-sm text-muted-foreground">分钟</span>
+        </div>
+      }
+    />
+  );
+};
+
 const SettingsPage = () => {
   return (
     <div className="flex h-full flex-col gap-4 p-6">
@@ -180,6 +244,13 @@ const SettingsPage = () => {
         <SettingRow
           title="呼不出翻译浮层？"
           description="在任意应用选中文字后按 Alt+T 翻译；无效时通常是 Alt+T 被其他程序占用"
+        />
+      </SettingsSection>
+      <SettingsSection title="密码本">
+        <VaultLockTimeoutRow />
+        <SettingRow
+          title="主密码"
+          description="在密码本页首次使用时设置；主密码丢失后条目数据无法恢复"
         />
       </SettingsSection>
     </div>

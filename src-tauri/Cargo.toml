@@ -39,6 +39,10 @@ base64 = "0.23.1"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "png"] }
 keyring = { version = "3", features = ["windows-native"] }
 tauri-plugin-http = "2"
+argon2 = "0.5"
+aes-gcm = "0.10"
+rand = "0.9"
+zeroize = "1"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

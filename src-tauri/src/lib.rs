@@ -5,16 +5,18 @@ pub mod overlay;
 pub mod palette;
 pub mod platform;
 pub mod translate;
+pub mod vault;
 
 #[cfg(test)]
 mod test_support;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
+    Emitter as _, Manager, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt as _, Shortcut, ShortcutState};
 
@@ -25,6 +27,7 @@ use clipboard::repository::ClipboardHistoryRepository;
 use overlay::OverlaySize;
 use platform::{ClipboardAccess, ClipboardWatcher};
 use translate::SecretState;
+use vault::VaultState;
 
 pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
 pub(crate) const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
@@ -149,6 +152,42 @@ fn setup_apps(app: &tauri::App) {
     app.manage(state);
 }
 
+/// 密码本：与剪贴板历史共用数据库文件（各自的连接）。剪贴板引擎不可用时
+/// 密码本照常初始化，仅复制功能降级报错。
+fn setup_vault(app: &tauri::App) {
+    let init = || -> Result<(), Box<dyn std::error::Error>> {
+        let db_path = app.path().app_data_dir()?.join("youmi.db");
+        let repo = Arc::new(vault::repository::VaultRepository::open(&db_path)?);
+        let engine = app
+            .try_state::<ClipboardState>()
+            .map(|s| Arc::clone(&s.engine));
+        app.manage(VaultState::new(repo, engine));
+        Ok(())
+    };
+
+    if let Err(e) = init() {
+        eprintln!("youmi: 密码本初始化失败（密码本不可用）: {e}");
+    }
+}
+
+/// 自动锁定哨兵：解锁会话到期（无操作超过锁定超时）即落锁并通知主窗口，
+/// 前端收到事件切回解锁界面。命令路径自带到期检查，哨兵负责界面联动。
+fn spawn_vault_autolock(app: tauri::AppHandle) {
+    let spawned = std::thread::Builder::new()
+        .name("vault-autolock".into())
+        .spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(1));
+            if let Some(state) = app.try_state::<VaultState>() {
+                if state.expire_if_due() {
+                    let _ = app.emit_to(MAIN_WINDOW_LABEL, vault::LOCKED_EVENT, ());
+                }
+            }
+        });
+    if let Err(e) = spawned {
+        eprintln!("youmi: 密码本自动锁定线程启动失败（仅失去界面联动）: {e}");
+    }
+}
+
 fn setup_palette_overlay(app: &tauri::App, hotkey: Shortcut) {
     if let Err(e) = overlay::create(
         app.app_handle(),
@@ -259,10 +298,12 @@ pub fn run() {
             app.manage(overlay::PinnedOverlays::default());
             setup_tray(app)?;
             setup_clipboard(app);
+            setup_vault(app);
             setup_apps(app);
             setup_clipboard_overlay(app, clipboard_hotkey);
             setup_palette_overlay(app, palette_hotkey);
             setup_translate_overlay(app, translate_hotkey);
+            spawn_vault_autolock(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -274,6 +315,16 @@ pub fn run() {
             clipboard::commands::clipboard_write_own_text,
             clipboard::commands::clipboard_write_own_image_png,
             clipboard::commands::clipboard_pasteback,
+            vault::vault_status,
+            vault::vault_setup,
+            vault::vault_unlock,
+            vault::vault_lock,
+            vault::vault_set_lock_timeout,
+            vault::vault_query,
+            vault::vault_create,
+            vault::vault_update,
+            vault::vault_delete,
+            vault::vault_copy,
             palette::palette_open_tool,
             apps::apps_query,
             apps::apps_launch,

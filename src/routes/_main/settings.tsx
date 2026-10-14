@@ -1,11 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import * as autostart from "@tauri-apps/plugin-autostart";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
 import { getClipboardCapacity, setClipboardCapacity } from "@/lib/clipboard";
+import {
+  eventToCombo,
+  formatCombo,
+  getShortcuts,
+  hasRequiredModifier,
+  setShortcut,
+  type ShortcutAction,
+  type ShortcutBinding,
+} from "@/lib/shortcuts";
 import { getAutostartPreference, setAutostartPreference } from "@/lib/settings";
 import {
   DEEPSEEK_DEFAULT_MODEL,
@@ -26,10 +35,12 @@ const SettingsSection = ({ title, children }: { title: string; children: ReactNo
 const SettingRow = ({
   title,
   description,
+  error,
   control,
 }: {
   title: string;
   description?: string;
+  error?: string;
   control?: ReactNode;
 }) => {
   return (
@@ -37,6 +48,7 @@ const SettingRow = ({
       <div className="flex flex-col gap-0.5">
         <span className="text-sm">{title}</span>
         {description && <span className="text-xs text-muted-foreground">{description}</span>}
+        {error && <span className="text-xs text-destructive">{error}</span>}
       </div>
       {control}
     </div>
@@ -95,6 +107,117 @@ const AutostartRow = () => {
         />
       }
     />
+  );
+};
+
+const SHORTCUT_ACTION_LABELS: Record<ShortcutAction, string> = {
+  clipboard: "剪贴板浮层",
+  palette: "命令面板",
+  translate: "划词翻译",
+};
+
+const SHORTCUT_DESCRIPTIONS: Record<ShortcutAction, string> = {
+  clipboard: "呼出/收起剪贴板浮层；呼不出时通常是组合键被其他程序占用",
+  palette: "呼出/收起命令面板；呼不出时通常是组合键被其他程序占用",
+  translate: "选中文字后呼出划词翻译；呼不出时通常是组合键被其他程序占用",
+};
+
+/** 录制式改键：点击修改后截获下一次完整组合键，Esc 取消；纯修饰键等待主键。 */
+const ShortcutRow = ({
+  binding,
+  onSettled,
+}: {
+  binding: ShortcutBinding;
+  onSettled: () => void;
+}) => {
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!recording) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      // 截获按键：不落进页面输入框，也不触发页面内快捷键（OS 级全局
+      // 快捷键拦不住，属录制固有边界）
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        setRecording(false);
+        return;
+      }
+      const combo = eventToCombo(event);
+      if (combo === null) return;
+      setRecording(false);
+      if (!hasRequiredModifier(combo)) {
+        setError("组合键需包含 Ctrl、Alt 或 Win 中的至少一个修饰键");
+        return;
+      }
+      void setShortcut(binding.action, combo)
+        .then(() => setError(null))
+        .catch((cause: unknown) => {
+          console.error("修改快捷键失败", cause);
+          setError(typeof cause === "string" ? cause : String(cause));
+        })
+        // 成败都以后端列表为准回显：注册/落盘部分失败时界面如实反映
+        .finally(onSettled);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [recording, binding.action, onSettled]);
+
+  return (
+    <SettingRow
+      title={SHORTCUT_ACTION_LABELS[binding.action]}
+      description={SHORTCUT_DESCRIPTIONS[binding.action]}
+      error={
+        error ??
+        (binding.registered
+          ? undefined
+          : "该组合键当前注册失败（可能被系统或其他程序占用），重新修改可重试")
+      }
+      control={
+        <div className="flex items-center gap-2">
+          <span
+            className={`min-w-28 text-right font-mono text-sm ${
+              recording ? "text-muted-foreground" : ""
+            }`}
+          >
+            {recording ? "按下新组合键…" : formatCombo(binding.combo)}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setError(null);
+              setRecording((current) => !current);
+            }}
+          >
+            {recording ? "取消" : "修改"}
+          </Button>
+        </div>
+      }
+    />
+  );
+};
+
+const ShortcutsSection = () => {
+  const [bindings, setBindings] = useState<ShortcutBinding[] | null>(null);
+
+  const load = useCallback(() => {
+    void getShortcuts()
+      .then(setBindings)
+      .catch((cause: unknown) => console.error("读取快捷键设置失败", cause));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <SettingsSection title="快捷键">
+      {bindings?.map((binding) => (
+        <ShortcutRow key={binding.action} binding={binding} onSettled={load} />
+      ))}
+    </SettingsSection>
   );
 };
 
@@ -231,20 +354,13 @@ const SettingsPage = () => {
       <SettingsSection title="通用">
         <AutostartRow />
       </SettingsSection>
+      <ShortcutsSection />
       <SettingsSection title="剪贴板">
         <ClipboardCapacityRow />
-        <SettingRow
-          title="呼不出剪贴板浮层？"
-          description="按 Alt+V 呼出/收起剪贴板浮层；无效时通常是 Alt+V 被其他程序占用"
-        />
       </SettingsSection>
       <SettingsSection title="划词翻译">
         <DeepSeekApiKeyRow />
         <DeepSeekModelRow />
-        <SettingRow
-          title="呼不出翻译浮层？"
-          description="在任意应用选中文字后按 Alt+T 翻译；无效时通常是 Alt+T 被其他程序占用"
-        />
       </SettingsSection>
       <SettingsSection title="密码本">
         <VaultLockTimeoutRow />

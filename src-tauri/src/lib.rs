@@ -4,6 +4,7 @@ pub mod db;
 pub mod overlay;
 pub mod palette;
 pub mod platform;
+pub mod shortcuts;
 pub mod translate;
 pub mod vault;
 
@@ -18,7 +19,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter as _, Manager, WindowEvent,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt as _, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 
 use clipboard::commands::ClipboardState;
 use clipboard::engine::ClipboardEngine;
@@ -26,27 +27,22 @@ use clipboard::pasteback::PastebackState;
 use clipboard::repository::ClipboardHistoryRepository;
 use overlay::OverlaySize;
 use platform::{ClipboardAccess, ClipboardWatcher};
+use shortcuts::ShortcutBindings;
 use translate::SecretState;
 use vault::VaultState;
 
 pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
 pub(crate) const CLIPBOARD_OVERLAY_LABEL: &str = "clipboard-overlay";
-/// 剪贴板浮层呼出/收起的全局快捷键，重启后保持不变。
-const CLIPBOARD_OVERLAY_HOTKEY: &str = "alt+v";
 /// 剪贴板浮层尺寸（逻辑像素）。
 const CLIPBOARD_OVERLAY_SIZE: OverlaySize = OverlaySize {
     width: 720.0,
     height: 560.0,
 };
-/// 命令面板呼出/收起的全局快捷键，重启后保持不变。
-const PALETTE_HOTKEY: &str = "super+alt+space";
 /// 命令面板尺寸（逻辑像素）：单输入框 + 条目列表的轻量形态，比剪贴板浮层小。
 const PALETTE_SIZE: OverlaySize = OverlaySize {
     width: 640.0,
     height: 420.0,
 };
-/// 划词翻译呼出的全局快捷键，重启后保持不变。
-const TRANSLATE_HOTKEY: &str = "alt+t";
 /// 划词翻译浮层尺寸（逻辑像素）：小浮层贴近光标显示。
 const TRANSLATE_OVERLAY_SIZE: OverlaySize = OverlaySize {
     width: 460.0,
@@ -128,7 +124,7 @@ fn setup_clipboard(app: &tauri::App) {
     }
 }
 
-fn setup_clipboard_overlay(app: &tauri::App, hotkey: Shortcut) {
+fn setup_clipboard_overlay(app: &tauri::App) {
     if let Err(e) = overlay::create(
         app.app_handle(),
         CLIPBOARD_OVERLAY_LABEL,
@@ -137,11 +133,6 @@ fn setup_clipboard_overlay(app: &tauri::App, hotkey: Shortcut) {
         CLIPBOARD_OVERLAY_SIZE,
     ) {
         eprintln!("youmi: 剪贴板浮层窗口创建失败: {e}");
-        return;
-    }
-    // 快捷键被其他程序占用时注册失败：仅降级日志，不阻塞应用启动
-    if let Err(e) = app.global_shortcut().register(hotkey) {
-        eprintln!("youmi: 注册 {CLIPBOARD_OVERLAY_HOTKEY} 失败（可能被其他程序占用）: {e}");
     }
 }
 
@@ -188,7 +179,7 @@ fn spawn_vault_autolock(app: tauri::AppHandle) {
     }
 }
 
-fn setup_palette_overlay(app: &tauri::App, hotkey: Shortcut) {
+fn setup_palette_overlay(app: &tauri::App) {
     if let Err(e) = overlay::create(
         app.app_handle(),
         palette::LABEL,
@@ -197,17 +188,12 @@ fn setup_palette_overlay(app: &tauri::App, hotkey: Shortcut) {
         PALETTE_SIZE,
     ) {
         eprintln!("youmi: 命令面板浮层窗口创建失败: {e}");
-        return;
-    }
-    // 快捷键被其他程序占用时注册失败：仅降级日志，不阻塞应用启动
-    if let Err(e) = app.global_shortcut().register(hotkey) {
-        eprintln!("youmi: 注册 {PALETTE_HOTKEY} 失败（可能被其他程序占用）: {e}");
     }
 }
 
 /// 划词翻译：凭据存取独立管理（引擎初始化失败时设置页仍可用）；取词依赖
 /// 剪贴板引擎的自家写入过滤，引擎缺失时热键降级为浮层内提示。
-fn setup_translate_overlay(app: &tauri::App, hotkey: Shortcut) {
+fn setup_translate_overlay(app: &tauri::App) {
     app.manage(SecretState {
         store: Arc::new(platform::WinSecretStore),
     });
@@ -229,20 +215,10 @@ fn setup_translate_overlay(app: &tauri::App, hotkey: Shortcut) {
     } else {
         eprintln!("youmi: 剪贴板引擎未初始化，划词取词不可用");
     }
-    // 快捷键被其他程序占用时注册失败：仅降级日志，不阻塞应用启动
-    if let Err(e) = app.global_shortcut().register(hotkey) {
-        eprintln!("youmi: 注册 {TRANSLATE_HOTKEY} 失败（可能被其他程序占用）: {e}");
-    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let clipboard_hotkey: Shortcut = CLIPBOARD_OVERLAY_HOTKEY
-        .parse()
-        .expect("内置快捷键字符串合法");
-    let palette_hotkey: Shortcut = PALETTE_HOTKEY.parse().expect("内置快捷键字符串合法");
-    let translate_hotkey: Shortcut = TRANSLATE_HOTKEY.parse().expect("内置快捷键字符串合法");
-
     tauri::Builder::default()
         // single-instance 必须最先注册：二次启动立即退出，并把唤起意图交给已有实例
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -257,28 +233,16 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, shortcut, event| {
+                .with_handler(|app, shortcut, event| {
                     if event.state != ShortcutState::Pressed {
                         return;
                     }
-                    if *shortcut == clipboard_hotkey {
-                        // 呼起前捕获前台窗口为回帖目标；
-                        // 收起分支（浮层自己在前台）捕获结果为无目标，恰好清掉过期目标
-                        clipboard::pasteback::capture_current_target(app);
-                        if let Err(e) = overlay::toggle(app, CLIPBOARD_OVERLAY_LABEL) {
-                            eprintln!("youmi: 呼出剪贴板浮层失败: {e}");
-                        }
-                    } else if *shortcut == palette_hotkey {
-                        if let Err(e) = overlay::toggle(app, palette::LABEL) {
-                            eprintln!("youmi: 呼出命令面板失败: {e}");
-                        }
-                    } else if *shortcut == translate_hotkey {
-                        // 取词必须先于显示（Ctrl+C 发给呼起时仍在前台的目标应用），
-                        // 编排含键击注入与轮询等待：放阻塞线程池，不占主线程
-                        let app = app.clone();
-                        tauri::async_runtime::spawn_blocking(move || {
-                            translate::capture_and_show(&app);
-                        });
+                    // 组合键 → 动作的映射在 ShortcutBindings 里，改键即时生效
+                    let Some(bindings) = app.try_state::<ShortcutBindings>() else {
+                        return;
+                    };
+                    if let Some(action) = bindings.action_of(*shortcut) {
+                        shortcuts::activate(app, action);
                     }
                 })
                 .build(),
@@ -300,9 +264,10 @@ pub fn run() {
             setup_clipboard(app);
             setup_vault(app);
             setup_apps(app);
-            setup_clipboard_overlay(app, clipboard_hotkey);
-            setup_palette_overlay(app, palette_hotkey);
-            setup_translate_overlay(app, translate_hotkey);
+            setup_clipboard_overlay(app);
+            setup_palette_overlay(app);
+            setup_translate_overlay(app);
+            shortcuts::setup(app);
             spawn_vault_autolock(app.handle().clone());
             Ok(())
         })
@@ -329,6 +294,8 @@ pub fn run() {
             apps::apps_query,
             apps::apps_launch,
             overlay::overlay_set_pinned,
+            shortcuts::shortcut_list,
+            shortcuts::shortcut_set,
             translate::translate_has_api_key,
             translate::translate_get_api_key,
             translate::translate_set_api_key,

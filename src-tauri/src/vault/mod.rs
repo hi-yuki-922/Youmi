@@ -805,7 +805,7 @@ mod tests {
         h.state.copy_field(id, VaultCopyField::Password).unwrap();
         let written = h.clip.sequence();
 
-        clear_if_still_ours(&h.state.engine.as_ref().unwrap(), written);
+        clear_if_still_ours(h.state.engine.as_ref().unwrap(), written);
 
         // 剪贴板被清空（写入空文本），且空写入同样不进历史
         assert_eq!(
@@ -830,7 +830,7 @@ mod tests {
             .set_content(crate::clipboard::model::ClipboardContent::Text(
                 "fresh user copy".into(),
             ));
-        clear_if_still_ours(&h.state.engine.as_ref().unwrap(), written);
+        clear_if_still_ours(h.state.engine.as_ref().unwrap(), written);
 
         assert_eq!(
             h.clip.content(),

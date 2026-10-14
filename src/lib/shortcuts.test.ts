@@ -1,39 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { eventToCombo, formatCombo, hasRequiredModifier } from "@/lib/shortcuts";
-
-const keyEvent = (overrides: Partial<KeyboardEvent>): KeyboardEvent =>
-  ({
-    code: "KeyV",
-    key: "v",
-    ctrlKey: false,
-    altKey: false,
-    shiftKey: false,
-    metaKey: false,
-    ...overrides,
-  }) as KeyboardEvent;
-
-describe("eventToCombo", () => {
-  it("collects modifiers in canonical order plus the physical key", () => {
-    expect(eventToCombo(keyEvent({ code: "KeyC", ctrlKey: true, shiftKey: true }))).toBe(
-      "ctrl+shift+KeyC",
-    );
-    expect(eventToCombo(keyEvent({ code: "Space", altKey: true, metaKey: true }))).toBe(
-      "alt+super+Space",
-    );
-    expect(eventToCombo(keyEvent({ code: "KeyT", altKey: true }))).toBe("alt+KeyT");
-  });
-
-  it("returns null while only modifiers are pressed", () => {
-    expect(eventToCombo(keyEvent({ code: "ControlLeft", key: "Control" }))).toBeNull();
-    expect(eventToCombo(keyEvent({ code: "AltRight", key: "Alt", altKey: true }))).toBeNull();
-    expect(eventToCombo(keyEvent({ code: "MetaLeft", key: "Meta", metaKey: true }))).toBeNull();
-  });
-
-  it("keeps modifier-less combos for the backend to reject", () => {
-    expect(eventToCombo(keyEvent({ code: "Digit1" }))).toBe("Digit1");
-  });
-});
+import { formatCombo, hasRequiredModifier } from "@/lib/shortcuts";
 
 describe("hasRequiredModifier", () => {
   it("accepts ctrl, alt and win combos", () => {

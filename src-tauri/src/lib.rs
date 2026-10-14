@@ -295,6 +295,8 @@ pub fn run() {
             apps::apps_launch,
             overlay::overlay_set_pinned,
             shortcuts::shortcut_list,
+            shortcuts::shortcut_record_begin,
+            shortcuts::shortcut_record_cancel,
             shortcuts::shortcut_set,
             translate::translate_has_api_key,
             translate::translate_get_api_key,

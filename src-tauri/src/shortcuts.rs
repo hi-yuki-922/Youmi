@@ -5,12 +5,14 @@
 
 use std::collections::HashMap;
 use std::str::FromStr as _;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager as _};
+use tauri::{AppHandle, Emitter as _, Manager as _};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt as _, Modifiers, Shortcut};
 use tauri_plugin_store::StoreExt as _;
+
+use crate::platform::{RecordOutcome, ShortcutRecorder, WinShortcutRecorder};
 
 /// 组合键在设置文件中的 key 前缀。
 const SETTINGS_KEY_PREFIX: &str = "shortcut.";
@@ -173,7 +175,7 @@ impl ShortcutBindings {
 
 /// 解析组合键字符串（插件解析格式），并要求至少含一个修饰键（Ctrl / Alt /
 /// Win 之一）；Shift 不算。
-fn parse_combo(combo: &str) -> Result<Shortcut, String> {
+pub(crate) fn parse_combo(combo: &str) -> Result<Shortcut, String> {
     let shortcut =
         Shortcut::from_str(combo).map_err(|e| format!("无法识别的组合键“{combo}”：{e}"))?;
     if !shortcut
@@ -401,6 +403,9 @@ pub fn setup(app: &mut tauri::App) {
         );
     }
     app.manage(ShortcutBindings::new(bindings));
+    app.manage(RecordState {
+        recorder: Arc::new(WinShortcutRecorder),
+    });
 }
 
 /// 当前各动作的组合键（设置页展示用）。
@@ -418,6 +423,58 @@ pub fn shortcut_set(
     combo: String,
 ) -> Result<(), String> {
     state.set(&app, action, &combo)
+}
+
+/// 录制事件：发往主窗口，payload 见 [`RecordEventPayload`]。
+pub const RECORD_EVENT: &str = "shortcut-record";
+
+/// 录制结果事件载荷：`combo` = 系统级截获的组合键规范串；Esc/超时/取消为
+/// cancelled。互斥由类型表达，不发双空载荷。
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum RecordEventPayload {
+    Recorded { combo: String },
+    Cancelled,
+}
+
+/// 改键录制的平台 seam。
+pub struct RecordState {
+    recorder: Arc<dyn ShortcutRecorder>,
+}
+
+fn record_sink(app: AppHandle) -> Arc<dyn Fn(RecordOutcome) + Send + Sync> {
+    Arc::new(move |outcome| {
+        let payload = match outcome {
+            RecordOutcome::Recorded(combo) => RecordEventPayload::Recorded { combo },
+            RecordOutcome::Cancelled => RecordEventPayload::Cancelled,
+        };
+        if let Err(e) = app.emit_to(crate::MAIN_WINDOW_LABEL, RECORD_EVENT, payload) {
+            eprintln!("youmi: 发送录制结果事件失败: {e}");
+        }
+    })
+}
+
+/// 开始一次性组合键录制。已在录制中时重启会话（旧会话的取消经事件通知，
+/// 旧录制行随之退出录制态）。
+#[tauri::command]
+pub fn shortcut_record_begin(
+    record: tauri::State<'_, RecordState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if record.recorder.begin(record_sink(app.clone())).is_err() {
+        record.recorder.cancel();
+        record
+            .recorder
+            .begin(record_sink(app))
+            .map_err(|e| format!("开始录制失败：{e}"))?;
+    }
+    Ok(())
+}
+
+/// 提前结束当前录制（用户点取消时调用）；不在录制中为空操作。
+#[tauri::command]
+pub fn shortcut_record_cancel(record: tauri::State<'_, RecordState>) {
+    record.recorder.cancel();
 }
 
 #[cfg(test)]

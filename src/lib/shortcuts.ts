@@ -6,6 +6,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export type ShortcutAction = "clipboard" | "palette" | "translate";
 
@@ -26,31 +27,26 @@ export const getShortcuts = (): Promise<ShortcutBinding[]> =>
 export const setShortcut = (action: ShortcutAction, combo: string): Promise<void> =>
   invoke("shortcut_set", { action, combo });
 
-const MODIFIER_CODES = new Set([
-  "ControlLeft",
-  "ControlRight",
-  "AltLeft",
-  "AltRight",
-  "MetaLeft",
-  "MetaRight",
-  "ShiftLeft",
-  "ShiftRight",
-]);
+/** 录制结果事件（Rust `RecordEventPayload` kebab-case tagged 序列化）。 */
+export type ShortcutRecordEvent = { kind: "recorded"; combo: string } | { kind: "cancelled" };
+
+const RECORD_EVENT = "shortcut-record";
 
 /**
- * keydown 事件 → 组合键规范串；纯修饰键按下（尚未出现主键）返回 null，
- * 调用方应继续等待。修饰键取自事件状态，主键用 KeyboardEvent.code 物理键位。
+ * 开始一次性组合键录制：系统级键盘钩子截获下一个组合键（按键不落入任何
+ * 应用，Alt+Space、Win+E 等 OS 保留组合因此可录），结果经 {@link onShortcutRecord}
+ * 事件回来；Esc 或超时以 cancelled 结束。已在录制中时重启会话。
  */
-export const eventToCombo = (event: KeyboardEvent): string | null => {
-  if (MODIFIER_CODES.has(event.code)) return null;
-  const parts: string[] = [];
-  if (event.ctrlKey) parts.push("ctrl");
-  if (event.altKey) parts.push("alt");
-  if (event.shiftKey) parts.push("shift");
-  if (event.metaKey) parts.push("super");
-  parts.push(event.code);
-  return parts.join("+");
-};
+export const beginShortcutRecord = (): Promise<void> => invoke("shortcut_record_begin");
+
+/** 提前结束当前录制；不在录制中为空操作。 */
+export const cancelShortcutRecord = (): Promise<void> => invoke("shortcut_record_cancel");
+
+/** 订阅录制结果事件；返回取消订阅函数。 */
+export const onShortcutRecord = (
+  handler: (event: ShortcutRecordEvent) => void,
+): Promise<() => void> =>
+  listen<ShortcutRecordEvent>(RECORD_EVENT, (event) => handler(event.payload));
 
 /** 组合键是否满足修饰键约束：至少含 Ctrl / Alt / Win 之一（Shift 不算）。 */
 export const hasRequiredModifier = (combo: string): boolean =>

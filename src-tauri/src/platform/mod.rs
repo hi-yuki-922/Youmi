@@ -13,6 +13,8 @@ pub use windows::clipboard::{WinClipboardAccess, WinClipboardWatcher};
 #[cfg(windows)]
 pub use windows::pasteback::WinPastebackAccess;
 #[cfg(windows)]
+pub use windows::record::WinShortcutRecorder;
+#[cfg(windows)]
 pub use windows::secrets::WinSecretStore;
 #[cfg(windows)]
 pub use windows::selection::WinSelectionAccess;
@@ -93,4 +95,27 @@ pub trait SecretStore: Send + Sync {
 
     /// 删除秘密；不存在视为已删除。
     fn delete(&self, key: &str) -> Result<(), PlatformError>;
+}
+
+/// 快捷键录制结果：`Recorded` 的组合键为规范串（与动作绑定的格式一致）。
+#[derive(Debug, PartialEq, Eq)]
+pub enum RecordOutcome {
+    Recorded(String),
+    Cancelled,
+}
+
+/// 快捷键录制 seam（ADR-0001）：系统级截获下一个组合键并吞掉按键。
+/// 改键 UI 必须经此录制——Alt+Space（窗口系统菜单）、Win+E（Shell）这类
+/// OS 保留组合到不了 webview 的 keydown，DOM 层捕获对它们天然失效。
+pub trait ShortcutRecorder: Send + Sync {
+    /// 开始一次性录制会话：截获第一个非修饰键组合经 `sink` 回调
+    /// [`RecordOutcome::Recorded`]（专用线程上调用），Esc / 超时 / [`Self::cancel`]
+    /// 回 [`RecordOutcome::Cancelled`]。已有会话进行中时返回 Err。
+    fn begin(
+        &self,
+        sink: std::sync::Arc<dyn Fn(RecordOutcome) + Send + Sync>,
+    ) -> Result<(), String>;
+
+    /// 结束当前录制；不在录制中时为空操作。
+    fn cancel(&self);
 }

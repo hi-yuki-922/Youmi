@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as autostart from "@tauri-apps/plugin-autostart";
 
 import { Button } from "@/components/ui/Button";
@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
 import { getClipboardCapacity, setClipboardCapacity } from "@/lib/clipboard";
 import {
-  eventToCombo,
+  beginShortcutRecord,
+  cancelShortcutRecord,
   formatCombo,
   getShortcuts,
   hasRequiredModifier,
+  onShortcutRecord,
   setShortcut,
   type ShortcutAction,
   type ShortcutBinding,
@@ -122,85 +124,50 @@ const SHORTCUT_DESCRIPTIONS: Record<ShortcutAction, string> = {
   translate: "选中文字后呼出划词翻译；呼不出时通常是组合键被其他程序占用",
 };
 
-/** 录制式改键：点击修改后截获下一次完整组合键，Esc 取消；纯修饰键等待主键。 */
+/** 快捷键行：展示与触发；录制会话由 section 统一持有（一次一个）。 */
 const ShortcutRow = ({
   binding,
-  onSettled,
+  recording,
+  error,
+  onRecordStart,
+  onRecordCancel,
 }: {
   binding: ShortcutBinding;
-  onSettled: () => void;
-}) => {
-  const [recording, setRecording] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!recording) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      // 截获按键：不落进页面输入框，也不触发页面内快捷键（OS 级全局
-      // 快捷键拦不住，属录制固有边界）
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.key === "Escape") {
-        setRecording(false);
-        return;
-      }
-      const combo = eventToCombo(event);
-      if (combo === null) return;
-      setRecording(false);
-      if (!hasRequiredModifier(combo)) {
-        setError("组合键需包含 Ctrl、Alt 或 Win 中的至少一个修饰键");
-        return;
-      }
-      void setShortcut(binding.action, combo)
-        .then(() => setError(null))
-        .catch((cause: unknown) => {
-          console.error("修改快捷键失败", cause);
-          setError(typeof cause === "string" ? cause : String(cause));
-        })
-        // 成败都以后端列表为准回显：注册/落盘部分失败时界面如实反映
-        .finally(onSettled);
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [recording, binding.action, onSettled]);
-
-  return (
-    <SettingRow
-      title={SHORTCUT_ACTION_LABELS[binding.action]}
-      description={SHORTCUT_DESCRIPTIONS[binding.action]}
-      error={
-        error ??
-        (binding.registered
-          ? undefined
-          : "该组合键当前注册失败（可能被系统或其他程序占用），重新修改可重试")
-      }
-      control={
-        <div className="flex items-center gap-2">
-          <span
-            className={`min-w-28 text-right font-mono text-sm ${
-              recording ? "text-muted-foreground" : ""
-            }`}
-          >
-            {recording ? "按下新组合键…" : formatCombo(binding.combo)}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setError(null);
-              setRecording((current) => !current);
-            }}
-          >
-            {recording ? "取消" : "修改"}
-          </Button>
-        </div>
-      }
-    />
-  );
-};
+  recording: boolean;
+  error?: string;
+  onRecordStart: () => void;
+  onRecordCancel: () => void;
+}) => (
+  <SettingRow
+    title={SHORTCUT_ACTION_LABELS[binding.action]}
+    description={SHORTCUT_DESCRIPTIONS[binding.action]}
+    error={
+      error ??
+      (binding.registered
+        ? undefined
+        : "该组合键当前注册失败（可能被系统或其他程序占用），重新修改可重试")
+    }
+    control={
+      <div className="flex items-center gap-2">
+        <span
+          className={`min-w-28 text-right font-mono text-sm ${
+            recording ? "text-muted-foreground" : ""
+          }`}
+        >
+          {recording ? "按下新组合键…" : formatCombo(binding.combo)}
+        </span>
+        <Button variant="outline" size="sm" onClick={recording ? onRecordCancel : onRecordStart}>
+          {recording ? "取消" : "修改"}
+        </Button>
+      </div>
+    }
+  />
+);
 
 const ShortcutsSection = () => {
   const [bindings, setBindings] = useState<ShortcutBinding[] | null>(null);
+  const [recording, setRecording] = useState<ShortcutAction | null>(null);
+  const [error, setError] = useState<{ action: ShortcutAction; message: string } | null>(null);
 
   const load = useCallback(() => {
     void getShortcuts()
@@ -212,10 +179,64 @@ const ShortcutsSection = () => {
     load();
   }, [load]);
 
+  // 录制会话结果经系统级事件回来：钩子在 Rust 侧截获按键（Alt+Space 等
+  // OS 保留组合的 keydown 根本到不了页面），Esc/超时/取消以 cancelled 结束
+  const recordingRef = useRef<ShortcutAction | null>(null);
+  useEffect(() => {
+    recordingRef.current = recording;
+  }, [recording]);
+
+  useEffect(() => {
+    const unlisten = onShortcutRecord((event) => {
+      const action = recordingRef.current;
+      setRecording(null);
+      if (!action || event.kind === "cancelled") return;
+      if (!hasRequiredModifier(event.combo)) {
+        setError({ action, message: "组合键需包含 Ctrl、Alt 或 Win 中的至少一个修饰键" });
+        return;
+      }
+      void setShortcut(action, event.combo)
+        .then(() => setError(null))
+        .catch((cause: unknown) => {
+          console.error("修改快捷键失败", cause);
+          setError({ action, message: typeof cause === "string" ? cause : String(cause) });
+        })
+        // 成败都以后端列表为准回显：注册/落盘部分失败时界面如实反映
+        .finally(load);
+    });
+    return () => {
+      void unlisten.then((off) => off());
+      // 离开页面时结束可能仍在进行的录制（不在录制中为空操作）
+      void cancelShortcutRecord().catch(() => {});
+    };
+  }, [load]);
+
+  const startRecording = (action: ShortcutAction) => {
+    setError(null);
+    setRecording(action);
+    void beginShortcutRecord().catch((cause: unknown) => {
+      console.error("开始录制失败", cause);
+      setError({ action, message: typeof cause === "string" ? cause : String(cause) });
+      setRecording(null);
+    });
+  };
+
+  const stopRecording = () => {
+    setRecording(null);
+    void cancelShortcutRecord().catch(() => {});
+  };
+
   return (
     <SettingsSection title="快捷键">
       {bindings?.map((binding) => (
-        <ShortcutRow key={binding.action} binding={binding} onSettled={load} />
+        <ShortcutRow
+          key={binding.action}
+          binding={binding}
+          recording={recording === binding.action}
+          error={error?.action === binding.action ? error.message : undefined}
+          onRecordStart={() => startRecording(binding.action)}
+          onRecordCancel={stopRecording}
+        />
       ))}
     </SettingsSection>
   );

@@ -4,6 +4,7 @@ pub mod apps;
 pub mod bmp;
 pub mod clipboard;
 pub mod pasteback;
+pub mod record;
 pub mod secrets;
 pub mod selection;
 

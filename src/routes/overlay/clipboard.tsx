@@ -61,21 +61,22 @@ const ClipboardOverlay = () => {
     placeholderData: (previous) => previous, // 搜索输入时列表不闪空
   });
 
+  const queryClient = useQueryClient();
+
   // 浮层 hide 而非销毁：重新呼起时找回搜索框焦点，并刷新历史
   // （WebView2 显示/隐藏窗口不派发 visibilitychange——实测——tanstack-query 的
-  // refetchOnWindowFocus 在这里永不触发，必须手动 refetch）。
-  const refetch = entriesQuery.refetch;
+  // refetchOnWindowFocus 在这里永不触发，必须手动刷新；列表各视图与清空入口
+  // 的显隐查询同前缀，一并 refetch，隐藏期捕获的新条目才都显现）。
   useEffect(() => {
     searchRef.current?.focus();
     const onWindowFocus = () => {
       searchRef.current?.focus();
-      void refetch();
+      void queryClient.refetchQueries({ queryKey: ["clipboard-entries"] });
     };
     window.addEventListener("focus", onWindowFocus);
     return () => window.removeEventListener("focus", onWindowFocus);
-  }, [refetch]);
+  }, [queryClient]);
 
-  const queryClient = useQueryClient();
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteClipboardEntry(id),
     onSuccess: () => {

@@ -3,9 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Image as ImageIcon, Search, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import {
+  clearClipboardHistory,
   deleteClipboardEntry,
   getClipboardImage,
   pastebackClipboardEntry,
@@ -19,6 +21,12 @@ type KindFilter = "all" | ClipboardKind;
 
 /** 浏览列表条数上限：与默认容量对齐；更大容量 + 无过滤浏览留待分页。 */
 const LIST_QUERY_LIMIT = 1000;
+
+/** 确认态自动退回的时限：足够读清提示，又不至于一直占着危险按钮。 */
+const CLEAR_CONFIRM_TIMEOUT_MS = 3000;
+
+/** 进入确认态后忽略点击的窗口：原地快速双击不该等于确认。 */
+const CLEAR_CONFIRM_GRACE_MS = 400;
 
 const KIND_FILTER_OPTIONS: ReadonlyArray<{ id: KindFilter; label: string }> = [
   { id: "all", label: "全部" },
@@ -78,6 +86,17 @@ const ClipboardOverlay = () => {
     },
   });
 
+  const clearMutation = useMutation({
+    mutationFn: clearClipboardHistory,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["clipboard-entries"] });
+      searchRef.current?.focus();
+    },
+    onError: (error) => {
+      console.error("清空剪贴板历史失败", error);
+    },
+  });
+
   // 回帖不改变历史（Rust 自家写入通道 + 完成后恢复原剪贴板），无需 invalidate；
   // 浮层由 Rust 侧在回帖流程中隐藏。copied-only 属正常降级，不打扰用户。
   const pastebackMutation = useMutation({
@@ -92,6 +111,14 @@ const ClipboardOverlay = () => {
   };
 
   const entries = entriesQuery.data ?? [];
+
+  // 清空作用于全库而非当前过滤结果：入口显隐跟随未过滤历史是否非空
+  const hasAnyQuery = useQuery({
+    queryKey: ["clipboard-entries", "any"],
+    queryFn: () => queryClipboardEntries({ limit: 1 }),
+    placeholderData: (previous) => previous,
+  });
+  const hasAny = (hasAnyQuery.data?.length ?? 0) > 0;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-sm">
@@ -121,6 +148,12 @@ const ClipboardOverlay = () => {
           onChange={setKind}
           className="shrink-0"
         />
+        {hasAny && (
+          <ClearHistoryButton
+            onClear={() => clearMutation.mutate()}
+            pending={clearMutation.isPending}
+          />
+        )}
       </div>
 
       {entriesQuery.isPending ? (
@@ -157,6 +190,74 @@ const EmptyState = ({ keyword, kind }: { keyword: string; kind: KindFilter }) =>
     message = "暂无图片条目";
   }
   return <p className="p-4 text-muted-foreground">{message}</p>;
+};
+
+/** 清空全部历史：两段式——首击进入确认态，限时内再击才执行；Esc、失焦或超时退回。 */
+const ClearHistoryButton = ({ onClear, pending }: { onClear: () => void; pending: boolean }) => {
+  const [armed, setArmed] = useState(false);
+  const armedAtRef = useRef(0);
+  const disarmTimerRef = useRef<number | null>(null);
+
+  const disarm = () => {
+    if (disarmTimerRef.current !== null) window.clearTimeout(disarmTimerRef.current);
+    disarmTimerRef.current = null;
+    setArmed(false);
+  };
+
+  const arm = () => {
+    armedAtRef.current = Date.now();
+    setArmed(true);
+    disarmTimerRef.current = window.setTimeout(disarm, CLEAR_CONFIRM_TIMEOUT_MS);
+  };
+
+  useEffect(() => () => disarm(), []);
+
+  // 确认态下按 Esc 退回，不依赖焦点仍在按钮上；窗口失焦也退回——浮层 hide
+  // 而非销毁，确认态会跨隐藏存活，重新呼起不该停留在"一击即清"的状态。
+  useEffect(() => {
+    if (!armed) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") disarm();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("blur", disarm);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("blur", disarm);
+    };
+  }, [armed]);
+
+  if (!armed) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="清空全部历史"
+        title="清空全部历史"
+        onClick={arm}
+        className="size-8 shrink-0 text-muted-foreground"
+      >
+        <Trash2 />
+      </Button>
+    );
+  }
+  return (
+    <Button
+      variant="destructive"
+      size="sm"
+      className="shrink-0"
+      autoFocus
+      disabled={pending}
+      onClick={() => {
+        if (Date.now() - armedAtRef.current < CLEAR_CONFIRM_GRACE_MS) return;
+        disarm();
+        onClear();
+      }}
+    >
+      <Trash2 />
+      确认清空
+    </Button>
+  );
 };
 
 const EntryRow = ({

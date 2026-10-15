@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-human（2026-10-15）
+**Status:** done（2026-10-15 实机验收通过）
 
 **来源:** ticket 19 全量 review，Standards 轴 smell baseline（Data Clumps / Duplicated Code / Primitive Obsession，均为 judgement call）。
 
@@ -29,3 +29,7 @@
 1. 编码转换三个子工具：右栏输入非法输入（如坏 Base64）出现红色错误条，修正后消失；布局与改前无肉眼差异。
 2. JSON 工具：格式化/压缩/转义成功出现绿色成功条；校验非法 JSON 出现红色条且带"第 X 行第 Y 列"定位。
 3. Query 键值表：非法 query 出现错误条。
+
+### 实机验收通过置 done（2026-10-15）
+
+用户确认验收通过，上述清单确认无问题，置 done。

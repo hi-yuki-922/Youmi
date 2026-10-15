@@ -19,6 +19,10 @@ export const CLIPBOARD_CAPACITY_DEFAULT = 1000;
 const CLIPBOARD_CAPACITY_KEY = "clipboard.capacity";
 const CLIPBOARD_CAPACITY_MAX = 1_000_000;
 
+/** 剪贴板引擎是否已初始化；false 时历史与容量设置均不生效。 */
+export const getClipboardEngineAvailable = (): Promise<boolean> =>
+  invoke<boolean>("clipboard_engine_available");
+
 /** 持久化设置中的历史容量；未设置过时返回默认值。 */
 export const getClipboardCapacity = (): Promise<number> =>
   getSetting(CLIPBOARD_CAPACITY_KEY, CLIPBOARD_CAPACITY_DEFAULT);
@@ -52,7 +56,12 @@ export const deleteClipboardEntry = (id: number): Promise<boolean> =>
 /** 清空全部历史，返回删除的条数；不影响容量设置。 */
 export const clearClipboardHistory = (): Promise<number> => invoke<number>("clipboard_clear");
 
-/** Youmi 自家写文本剪贴板：引擎 pending 标记保证不入历史。 */
+/** 用户侧复制通道（工具页复制按钮等）：写文本并让监听器照常捕获入史。 */
+export const writeClipboardText = (text: string): Promise<void> =>
+  invoke<void>("clipboard_write_text", { text });
+
+/** 自家写入通道（密码复制、划词模拟复制等）：写剪贴板但不进入历史。
+ * 与 `writeClipboardText` 构成仅有的两条前端写路径。 */
 export const writeOwnClipboardText = (text: string): Promise<void> =>
   invoke<void>("clipboard_write_own_text", { text });
 

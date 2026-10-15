@@ -5,7 +5,11 @@ import * as autostart from "@tauri-apps/plugin-autostart";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
-import { getClipboardCapacity, setClipboardCapacity } from "@/lib/clipboard";
+import {
+  getClipboardCapacity,
+  getClipboardEngineAvailable,
+  setClipboardCapacity,
+} from "@/lib/clipboard";
 import {
   beginShortcutRecord,
   cancelShortcutRecord,
@@ -250,11 +254,13 @@ const ShortcutsSection = () => {
   );
 };
 
-/** 容量输入失焦/回车才提交；以引擎 clamp 后的值回显，非法输入恢复原值。 */
+/** 容量输入失焦/回车才提交；以引擎 clamp 后的值回显，非法输入恢复原值。
+ * 引擎降级（初始化失败）时容量无从生效：输入禁用并如实呈现失效。 */
 const ClipboardCapacityRow = () => {
   const [value, setValue] = useState("");
   const [committed, setCommitted] = useState<number | null>(null);
-  const [ready, setReady] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [engineAvailable, setEngineAvailable] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -262,12 +268,17 @@ const ClipboardCapacityRow = () => {
       if (!active) return;
       setValue(String(capacity));
       setCommitted(capacity);
-      setReady(true);
+      setLoaded(true);
+    });
+    void getClipboardEngineAvailable().then((ok) => {
+      if (active) setEngineAvailable(ok);
     });
     return () => {
       active = false;
     };
   }, []);
+
+  const ready = loaded && engineAvailable;
 
   const commit = async () => {
     if (!ready) return;
@@ -292,6 +303,7 @@ const ClipboardCapacityRow = () => {
     <SettingRow
       title="历史容量"
       description="保留的最多条数，超出后自动淘汰最旧条目"
+      error={loaded && !engineAvailable ? "剪贴板引擎未启用，历史容量设置不可用" : undefined}
       control={
         <div className="flex items-center gap-2">
           <Input

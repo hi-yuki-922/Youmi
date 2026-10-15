@@ -11,9 +11,14 @@ import { router } from "@/Router";
 
 const MainLayout = () => {
   useEffect(() => {
-    // 启动即把持久化的配置应用到 Rust 侧：生效不依赖用户访问设置页
-    void applyClipboardCapacity();
-    void applyVaultLockTimeout();
+    // 启动即把持久化的配置应用到 Rust 侧：生效不依赖用户访问设置页。
+    // 引擎初始化失败时对应 command 会 reject，告警即可，不阻塞界面
+    void applyClipboardCapacity().catch((cause) => {
+      console.warn("启动应用剪贴板历史容量失败（剪贴板历史可能不可用）", cause);
+    });
+    void applyVaultLockTimeout().catch((cause) => {
+      console.warn("启动应用密码本锁定超时失败（密码本可能不可用）", cause);
+    });
   }, []);
 
   useEffect(() => {

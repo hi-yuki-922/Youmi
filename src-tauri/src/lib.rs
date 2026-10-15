@@ -272,11 +272,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            clipboard::commands::clipboard_engine_available,
             clipboard::commands::clipboard_query,
             clipboard::commands::clipboard_get_image,
             clipboard::commands::clipboard_delete,
             clipboard::commands::clipboard_clear,
             clipboard::commands::clipboard_set_capacity,
+            clipboard::commands::clipboard_write_text,
             clipboard::commands::clipboard_write_own_text,
             clipboard::commands::clipboard_write_own_image_png,
             clipboard::commands::clipboard_pasteback,

@@ -9,6 +9,7 @@ use super::engine::ClipboardEngine;
 use super::model::ClipboardKind;
 use super::pasteback::{self, PastebackOutcome, PastebackState};
 use super::repository::{ClipboardEntry, ClipboardHistoryRepository, HistoryQuery};
+use crate::platform::{ClipboardAccess as _, WinClipboardAccess};
 
 /// 默认单次查询条数。
 const DEFAULT_QUERY_LIMIT: u32 = 100;
@@ -16,6 +17,13 @@ const DEFAULT_QUERY_LIMIT: u32 = 100;
 pub struct ClipboardState {
     pub engine: Arc<ClipboardEngine>,
     pub repo: Arc<ClipboardHistoryRepository>,
+}
+
+/// 引擎是否已初始化（数据库损坏等会走降级路径，State 不被管理）；
+/// false 时历史与容量设置均不生效，前端据此呈现失效态。
+#[tauri::command]
+pub fn clipboard_engine_available(app: tauri::AppHandle) -> bool {
+    app.try_state::<ClipboardState>().is_some()
 }
 
 #[tauri::command]
@@ -66,6 +74,14 @@ pub fn clipboard_set_capacity(
         .repo
         .set_capacity(capacity.clamp(1, 1_000_000) as usize)
         .map_err(|e| e.to_string())
+}
+
+/// 用户侧复制通道（工具页复制按钮等）：写文本，监听器照常捕获入史。
+/// 与下方自家通道构成仅有的两条前端写路径。不依赖引擎状态——引擎降级时
+/// 复制仍可用，只是不入史。
+#[tauri::command]
+pub fn clipboard_write_text(text: String) -> Result<(), String> {
+    WinClipboardAccess.write_text(&text).map_err(|e| e.0)
 }
 
 /// 自家写入通道（密码复制、划词模拟复制等）：写剪贴板但不进入历史。

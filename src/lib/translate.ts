@@ -14,7 +14,7 @@ import { buildTranslatePrompt, type TranslateDirection } from "@/tools/translate
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
 const MODEL_KEY = "translate.model";
 
-export const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
+export const DEEPSEEK_DEFAULT_MODEL = "deepseek-flash";
 
 export const getTranslateModel = (): Promise<string> =>
   getSetting(MODEL_KEY, DEEPSEEK_DEFAULT_MODEL);

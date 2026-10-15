@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { CopyButton } from "@/components/CopyButton";
 import { Button } from "@/components/ui/Button";
+import { FeedbackStrip } from "@/components/ui/FeedbackStrip";
 import { Input } from "@/components/ui/Input";
 import { LabeledTextarea } from "@/components/ui/LabeledTextarea";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
@@ -42,10 +43,8 @@ const EncodingToolPage = () => {
       {active === "svg-url" && (
         <InstantConverter
           hint="双向即时转换，编码结果可直接用于 CSS background-image。"
-          leftLabel="SVG 源码"
-          leftPlaceholder="粘贴 SVG 源码"
-          rightLabel="URL 编码（data URI）"
-          rightPlaceholder="粘贴 data URI 或编码后的文本"
+          left={{ label: "SVG 源码", placeholder: "粘贴 SVG 源码" }}
+          right={{ label: "URL 编码（data URI）", placeholder: "粘贴 data URI 或编码后的文本" }}
           toRight={svgToDataUri}
           toLeft={dataUriToSvg}
         />
@@ -53,10 +52,8 @@ const EncodingToolPage = () => {
       {active === "base64" && (
         <InstantConverter
           hint="双向即时转换，按 UTF-8 编解码，兼容 base64url 与换行分隔的输入。"
-          leftLabel="文本"
-          leftPlaceholder="输入或粘贴文本"
-          rightLabel="Base64"
-          rightPlaceholder="粘贴 Base64 字符串"
+          left={{ label: "文本", placeholder: "输入或粘贴文本" }}
+          right={{ label: "Base64", placeholder: "粘贴 Base64 字符串" }}
           toRight={textToBase64}
           toLeft={base64ToText}
         />
@@ -66,12 +63,8 @@ const EncodingToolPage = () => {
   );
 };
 
-const ErrorStrip = ({ message }: { message: string | null }) => {
-  if (!message) return null;
-  return (
-    <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{message}</div>
-  );
-};
+/** 转换器一侧的标签与占位提示。 */
+type ConverterSide = { label: string; placeholder: string };
 
 /**
  * 双栏即时转换器：编辑任意一侧，另一侧立即更新。
@@ -79,36 +72,32 @@ const ErrorStrip = ({ message }: { message: string | null }) => {
  */
 const InstantConverter = ({
   hint,
-  leftLabel,
-  leftPlaceholder,
-  rightLabel,
-  rightPlaceholder,
+  left,
+  right,
   toRight,
   toLeft,
 }: {
   hint: string;
-  leftLabel: string;
-  leftPlaceholder: string;
-  rightLabel: string;
-  rightPlaceholder: string;
+  left: ConverterSide;
+  right: ConverterSide;
   toRight: (value: string) => string;
   toLeft: (value: string) => ConvertResult<string>;
 }) => {
-  const [left, setLeft] = useState("");
-  const [right, setRight] = useState("");
+  const [leftText, setLeftText] = useState("");
+  const [rightText, setRightText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const handleLeftChange = (value: string) => {
-    setLeft(value);
-    setRight(toRight(value));
+    setLeftText(value);
+    setRightText(toRight(value));
     setError(null);
   };
 
   const handleRightChange = (value: string) => {
-    setRight(value);
+    setRightText(value);
     const result = toLeft(value);
     if (result.ok) {
-      setLeft(result.value);
+      setLeftText(result.value);
       setError(null);
     } else {
       setError(result.message);
@@ -118,21 +107,21 @@ const InstantConverter = ({
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
       <p className="text-sm text-muted-foreground">{hint}</p>
-      <ErrorStrip message={error} />
+      {error && <FeedbackStrip kind="error">{error}</FeedbackStrip>}
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
         <LabeledTextarea
-          label={leftLabel}
-          value={left}
+          label={left.label}
+          value={leftText}
           onChange={(event) => handleLeftChange(event.target.value)}
-          placeholder={leftPlaceholder}
-          action={<CopyButton text={left} variant="ghost" />}
+          placeholder={left.placeholder}
+          action={<CopyButton text={leftText} variant="ghost" />}
         />
         <LabeledTextarea
-          label={rightLabel}
-          value={right}
+          label={right.label}
+          value={rightText}
           onChange={(event) => handleRightChange(event.target.value)}
-          placeholder={rightPlaceholder}
-          action={<CopyButton text={right} variant="ghost" />}
+          placeholder={right.placeholder}
+          action={<CopyButton text={rightText} variant="ghost" />}
         />
       </div>
     </section>
@@ -178,7 +167,7 @@ const QueryTableTool = () => {
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
       <p className="text-sm text-muted-foreground">双向即时转换：编辑任意一侧，另一侧同步更新。</p>
-      <ErrorStrip message={error} />
+      {error && <FeedbackStrip kind="error">{error}</FeedbackStrip>}
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
         <LabeledTextarea
           label="Query 字符串"

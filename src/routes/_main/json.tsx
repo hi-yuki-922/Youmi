@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { CopyButton } from "@/components/CopyButton";
 import { Button } from "@/components/ui/Button";
+import { FeedbackStrip } from "@/components/ui/FeedbackStrip";
 import {
   Select,
   SelectContent,
@@ -11,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
-import { cn } from "@/lib/utils";
 import {
   escapeToJsonString,
   formatJson,
@@ -104,18 +104,11 @@ const JsonToolPage = () => {
       </div>
 
       {status.kind !== "idle" && (
-        <div
-          className={cn(
-            "rounded-md px-3 py-2 text-sm",
-            status.kind === "success"
-              ? "bg-success/10 text-success"
-              : "bg-destructive/10 text-destructive",
-          )}
-        >
+        <FeedbackStrip kind={status.kind}>
           {status.kind === "error" && status.line !== undefined && status.column !== undefined
             ? `第 ${status.line} 行第 ${status.column} 列：${status.text}`
             : status.text}
-        </div>
+        </FeedbackStrip>
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">

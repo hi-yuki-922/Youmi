@@ -259,26 +259,26 @@ const ShortcutsSection = () => {
 const ClipboardCapacityRow = () => {
   const [value, setValue] = useState("");
   const [committed, setCommitted] = useState<number | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  const [engineAvailable, setEngineAvailable] = useState(false);
+  const [engine, setEngine] = useState<"probing" | "up" | "down">("probing");
 
   useEffect(() => {
     let active = true;
-    void getClipboardCapacity().then((capacity) => {
-      if (!active) return;
-      setValue(String(capacity));
-      setCommitted(capacity);
-      setLoaded(true);
-    });
+    void getClipboardCapacity()
+      .then((capacity) => {
+        if (!active) return;
+        setValue(String(capacity));
+        setCommitted(capacity);
+      })
+      .catch((cause) => console.error("读取剪贴板历史容量失败", cause));
     void getClipboardEngineAvailable().then((ok) => {
-      if (active) setEngineAvailable(ok);
+      if (active) setEngine(ok ? "up" : "down");
     });
     return () => {
       active = false;
     };
   }, []);
 
-  const ready = loaded && engineAvailable;
+  const ready = engine === "up" && committed !== null;
 
   const commit = async () => {
     if (!ready) return;
@@ -303,7 +303,7 @@ const ClipboardCapacityRow = () => {
     <SettingRow
       title="历史容量"
       description="保留的最多条数，超出后自动淘汰最旧条目"
-      error={loaded && !engineAvailable ? "剪贴板引擎未启用，历史容量设置不可用" : undefined}
+      error={engine === "down" ? "剪贴板引擎未启用，历史容量设置不可用" : undefined}
       control={
         <div className="flex items-center gap-2">
           <Input

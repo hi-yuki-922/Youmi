@@ -191,6 +191,14 @@ const ShortcutsSection = () => {
       const action = recordingRef.current;
       setRecording(null);
       if (!action || event.kind === "cancelled") return;
+      // 超时未截获到按键：多半是按键被其他软件的键盘钩子拦走，如实提示
+      if (event.kind === "timeout") {
+        setError({
+          action,
+          message: "10 秒内未截获到按键（可能被其他软件拦截），已结束录制，请重试",
+        });
+        return;
+      }
       if (!hasRequiredModifier(event.combo)) {
         setError({ action, message: "组合键需包含 Ctrl、Alt 或 Win 中的至少一个修饰键" });
         return;

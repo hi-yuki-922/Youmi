@@ -428,13 +428,14 @@ pub fn shortcut_set(
 /// 录制事件：发往主窗口，payload 见 [`RecordEventPayload`]。
 pub const RECORD_EVENT: &str = "shortcut-record";
 
-/// 录制结果事件载荷：`combo` = 系统级截获的组合键规范串；Esc/超时/取消为
-/// cancelled。互斥由类型表达，不发双空载荷。
+/// 录制结果事件载荷：`combo` = 系统级截获的组合键规范串；Esc/主动取消为
+/// cancelled，超时未截获为 timeout。互斥由类型表达，不发双空载荷。
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum RecordEventPayload {
     Recorded { combo: String },
     Cancelled,
+    Timeout,
 }
 
 /// 改键录制的平台 seam。
@@ -447,6 +448,7 @@ fn record_sink(app: AppHandle) -> Arc<dyn Fn(RecordOutcome) + Send + Sync> {
         let payload = match outcome {
             RecordOutcome::Recorded(combo) => RecordEventPayload::Recorded { combo },
             RecordOutcome::Cancelled => RecordEventPayload::Cancelled,
+            RecordOutcome::Timeout => RecordEventPayload::Timeout,
         };
         if let Err(e) = app.emit_to(crate::MAIN_WINDOW_LABEL, RECORD_EVENT, payload) {
             eprintln!("youmi: 发送录制结果事件失败: {e}");

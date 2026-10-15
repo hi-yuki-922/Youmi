@@ -28,14 +28,18 @@ export const setShortcut = (action: ShortcutAction, combo: string): Promise<void
   invoke("shortcut_set", { action, combo });
 
 /** 录制结果事件（Rust `RecordEventPayload` kebab-case tagged 序列化）。 */
-export type ShortcutRecordEvent = { kind: "recorded"; combo: string } | { kind: "cancelled" };
+export type ShortcutRecordEvent =
+  | { kind: "recorded"; combo: string }
+  | { kind: "cancelled" }
+  | { kind: "timeout" };
 
 const RECORD_EVENT = "shortcut-record";
 
 /**
  * 开始一次性组合键录制：系统级键盘钩子截获下一个组合键（按键不落入任何
  * 应用，Alt+Space、Win+E 等 OS 保留组合因此可录），结果经 {@link onShortcutRecord}
- * 事件回来；Esc 或超时以 cancelled 结束。已在录制中时重启会话。
+ * 事件回来；Esc / 主动取消以 cancelled 结束，超时未截获以 timeout 结束。
+ * 已在录制中时重启会话。
  */
 export const beginShortcutRecord = (): Promise<void> => invoke("shortcut_record_begin");
 

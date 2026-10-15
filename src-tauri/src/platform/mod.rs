@@ -98,10 +98,12 @@ pub trait SecretStore: Send + Sync {
 }
 
 /// 快捷键录制结果：`Recorded` 的组合键为规范串（与动作绑定的格式一致）。
+/// `Cancelled` 为 Esc / 主动取消，`Timeout` 为超时未截获到组合键。
 #[derive(Debug, PartialEq, Eq)]
 pub enum RecordOutcome {
     Recorded(String),
     Cancelled,
+    Timeout,
 }
 
 /// 快捷键录制 seam（ADR-0001）：系统级截获下一个组合键并吞掉按键。
@@ -109,8 +111,9 @@ pub enum RecordOutcome {
 /// OS 保留组合到不了 webview 的 keydown，DOM 层捕获对它们天然失效。
 pub trait ShortcutRecorder: Send + Sync {
     /// 开始一次性录制会话：截获第一个非修饰键组合经 `sink` 回调
-    /// [`RecordOutcome::Recorded`]（专用线程上调用），Esc / 超时 / [`Self::cancel`]
-    /// 回 [`RecordOutcome::Cancelled`]。已有会话进行中时返回 Err。
+    /// [`RecordOutcome::Recorded`]（专用线程上调用），Esc / [`Self::cancel`]
+    /// 回 [`RecordOutcome::Cancelled`]，超时回 [`RecordOutcome::Timeout`]。
+    /// 已有会话进行中时接管（旧会话按取消交付，新会话照常开始）。
     fn begin(
         &self,
         sink: std::sync::Arc<dyn Fn(RecordOutcome) + Send + Sync>,

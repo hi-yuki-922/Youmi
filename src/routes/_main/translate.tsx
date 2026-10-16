@@ -196,13 +196,13 @@ const TranslatePage = () => {
           }}
           placeholder="输入要翻译的文本"
           action={
-            <div className="flex items-center gap-1">
+            <>
               <span className="flex items-center gap-0.5" title="Ctrl+Enter 翻译">
                 <Kbd>⌃</Kbd>
                 <Kbd>⏎</Kbd>
               </span>
               <ClearButton label="清空原文" onClick={clearInput} disabled={input === ""} />
-            </div>
+            </>
           }
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">

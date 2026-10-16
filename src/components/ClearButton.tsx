@@ -1,8 +1,8 @@
-import { X } from "lucide-react";
+import { BrushCleaning } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 
-/** 一键清空输入的图标按钮：置于输入框 label 行动作位，直接清空不做确认。 */
+/** 一键清空输入的图标按钮（BrushCleaning）：置于输入框 label 行动作位，直接清空不做确认。 */
 export const ClearButton = ({
   label,
   onClick,
@@ -21,6 +21,6 @@ export const ClearButton = ({
     disabled={disabled}
     className="size-8 shrink-0 text-muted-foreground"
   >
-    <X />
+    <BrushCleaning />
   </Button>
 );

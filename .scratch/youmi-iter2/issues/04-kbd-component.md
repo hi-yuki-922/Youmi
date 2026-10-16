@@ -4,11 +4,11 @@
 
 **Blocked by:** 无——可立即开始
 
-**Status:** ready-for-human（2026-10-16 实现完成，实机验证通过，待人工确认）
+**Status:** done（2026-10-16 实机验收通过）
 
-- [ ] Kbd 组件入库（风格与既有 design token 一致）
-- [ ] 组合键格式化符号映射完整（含多修饰组合 `super+alt+space` → ⊞ ⌘ Space）
-- [ ] 主键区字母/数字原样展示（如 Alt+V → ⌘ V）
+- [x] Kbd 组件入库（风格与既有 design token 一致）
+- [x] 组合键格式化符号映射完整（含多修饰组合 `super+alt+space` → ⊞ ⌘ Space）
+- [x] 主键区字母/数字原样展示（如 Alt+V → ⌘ V）
 - [x] vitest 覆盖格式化映射
 
 ## Comments

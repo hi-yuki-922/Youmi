@@ -20,11 +20,12 @@ const LabeledTextarea = ({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
+      {/* min-h-8：无 action 的一侧与按钮同高，保证双栏 textarea 顶边对齐 */}
+      <div className="flex min-h-8 items-center justify-between gap-2">
         <label htmlFor={textareaId} className="text-sm font-medium text-muted-foreground">
           {label}
         </label>
-        {action}
+        {action && <div className="flex items-center gap-1">{action}</div>}
       </div>
       <Textarea
         id={textareaId}

@@ -5,6 +5,7 @@ import { useDeferredValue, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Kbd } from "@/components/ui/Kbd";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import {
   clearClipboardHistory,
@@ -174,8 +175,13 @@ const ClipboardOverlay = () => {
         </ul>
       )}
 
-      <p className="border-t px-4 py-1.5 text-xs text-muted-foreground">
-        ↑↓ 选择，回车或双击回帖到之前的窗口
+      <p className="flex items-center gap-1.5 border-t px-4 py-1.5 text-xs text-muted-foreground">
+        <Kbd>↑</Kbd>
+        <Kbd>↓</Kbd>
+        <span>选择</span>
+        <span>·</span>
+        <Kbd>⏎</Kbd>
+        <span>或双击回帖到之前的窗口</span>
       </p>
     </div>
   );

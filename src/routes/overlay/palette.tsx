@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { Input } from "@/components/ui/Input";
+import { Kbd } from "@/components/ui/Kbd";
 import { launchApp, listApps, searchApps, type AppEntry } from "@/lib/apps";
 import { writeOwnClipboardText } from "@/lib/clipboard";
 import { openTool } from "@/lib/palette";
@@ -161,8 +162,16 @@ const PaletteOverlay = () => {
         </ul>
       )}
 
-      <p className="border-t px-4 py-1.5 text-xs text-muted-foreground">
-        ↑↓ 选择 · 回车 打开工具、启动应用或复制结果 · Esc 关闭
+      <p className="flex items-center gap-1.5 border-t px-4 py-1.5 text-xs text-muted-foreground">
+        <Kbd>↑</Kbd>
+        <Kbd>↓</Kbd>
+        <span>选择</span>
+        <span>·</span>
+        <Kbd>⏎</Kbd>
+        <span>打开工具、启动应用或复制结果</span>
+        <span>·</span>
+        <Kbd>⎋</Kbd>
+        <span>关闭</span>
       </p>
     </div>
   );
@@ -179,7 +188,7 @@ const PaletteRow = ({
   onHover: () => void;
   onActivate: () => void;
 }) => {
-  const hint = item.kind === "calc" ? "回车复制" : item.kind === "tool" ? "回车打开" : "回车启动";
+  const hint = item.kind === "calc" ? "复制" : item.kind === "tool" ? "打开" : "启动";
   return (
     <li
       role="option"
@@ -204,7 +213,12 @@ const PaletteRow = ({
           <span className="min-w-0 flex-1 truncate">{item.app.name}</span>
         </>
       )}
-      {active && <span className="shrink-0 text-xs text-muted-foreground">{hint}</span>}
+      {active && (
+        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+          <Kbd>⏎</Kbd>
+          <span>{hint}</span>
+        </span>
+      )}
     </li>
   );
 };

@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SquarePen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as autostart from "@tauri-apps/plugin-autostart";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ComboKbd } from "@/components/ui/Kbd";
 import { Switch } from "@/components/ui/Switch";
 import {
   getClipboardCapacity,
@@ -13,7 +15,6 @@ import {
 import {
   beginShortcutRecord,
   cancelShortcutRecord,
-  formatCombo,
   getShortcuts,
   hasRequiredModifier,
   onShortcutRecord,
@@ -40,11 +41,13 @@ const SettingsSection = ({ title, children }: { title: string; children: ReactNo
 
 const SettingRow = ({
   title,
+  tag,
   description,
   error,
   control,
 }: {
   title: string;
+  tag?: string;
   description?: string;
   error?: string;
   control?: ReactNode;
@@ -52,7 +55,14 @@ const SettingRow = ({
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm">{title}</span>
+        <span className="flex items-center gap-1.5 text-sm">
+          {title}
+          {tag && (
+            <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+              {tag}
+            </span>
+          )}
+        </span>
         {description && <span className="text-xs text-muted-foreground">{description}</span>}
         {error && <span className="text-xs text-destructive">{error}</span>}
       </div>
@@ -128,23 +138,48 @@ const SHORTCUT_DESCRIPTIONS: Record<ShortcutAction, string> = {
   translate: "选中文字后呼出划词翻译；呼不出时通常是组合键被其他程序占用",
 };
 
-/** 快捷键行：展示与触发；录制会话由 section 统一持有（一次一个）。 */
+/** 快捷键生效作用域：全局 = 系统级注册、任意应用生效；剪贴板 = 浮层窗口内生效。 */
+type ShortcutScope = "global" | "clipboard";
+
+const SCOPE_META: Record<ShortcutScope, { label: string; description: string }> = {
+  global: { label: "全局", description: "系统级注册，任意应用内生效" },
+  clipboard: { label: "剪贴板", description: "剪贴板浮层窗口内生效，不经系统注册" },
+};
+
+/** 作用域分组卡片：组头标注作用域与生效范围，条目行以分隔线排列。 */
+const ScopeGroupCard = ({ scope, children }: { scope: ShortcutScope; children: ReactNode }) => {
+  const meta = SCOPE_META[scope];
+  return (
+    <div className="overflow-hidden rounded-lg border bg-card">
+      <div className="border-b bg-muted/40 px-4 py-2">
+        <span className="text-xs font-medium">{meta.label}</span>
+        <span className="ml-2 text-xs text-muted-foreground">{meta.description}</span>
+      </div>
+      <div className="divide-y">{children}</div>
+    </div>
+  );
+};
+
+/** 快捷键行：Kbd 呈现组合键；图标按钮进入录制，录制中按钮隐藏（一次只有一个录制会话）。 */
 const ShortcutRow = ({
+  scope,
   binding,
   recording,
   error,
   onRecordStart,
-  onRecordCancel,
 }: {
+  scope: ShortcutScope;
   binding: ShortcutBinding;
   recording: boolean;
   error?: string;
   onRecordStart: () => void;
-  onRecordCancel: () => void;
 }) => (
   <SettingRow
     title={SHORTCUT_ACTION_LABELS[binding.action]}
-    description={SHORTCUT_DESCRIPTIONS[binding.action]}
+    tag={SCOPE_META[scope].label}
+    description={
+      recording ? "点击任意位置或按 Esc 取消录制" : SHORTCUT_DESCRIPTIONS[binding.action]
+    }
     error={
       error ??
       (binding.registered
@@ -152,18 +187,23 @@ const ShortcutRow = ({
         : "该组合键当前注册失败（可能被系统或其他程序占用），重新修改可重试")
     }
     control={
-      <div className="flex items-center gap-2">
-        <span
-          className={`min-w-28 text-right font-mono text-sm ${
-            recording ? "text-muted-foreground" : ""
-          }`}
-        >
-          {recording ? "按下新组合键…" : formatCombo(binding.combo)}
-        </span>
-        <Button variant="outline" size="sm" onClick={recording ? onRecordCancel : onRecordStart}>
-          {recording ? "取消" : "修改"}
-        </Button>
-      </div>
+      recording ? (
+        <span className="text-sm text-muted-foreground">按下新组合键…</span>
+      ) : (
+        <div className="flex items-center gap-2">
+          <ComboKbd combo={binding.combo} />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="修改快捷键"
+            title="修改快捷键"
+            onClick={onRecordStart}
+            className="size-8 shrink-0 text-muted-foreground"
+          >
+            <SquarePen />
+          </Button>
+        </div>
+      )
     }
   />
 );
@@ -233,24 +273,35 @@ const ShortcutsSection = () => {
     });
   };
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     setRecording(null);
     void cancelShortcutRecord().catch(() => {});
-  };
+  }, []);
+
+  // 录制中点击任意位置即取消（Esc 取消仍由 Rust 钩子经事件返回）。监听在
+  // 状态落定后才挂上：触发本次录制的那个 click 不会立刻自取消。
+  useEffect(() => {
+    if (!recording) return;
+    window.addEventListener("mousedown", stopRecording);
+    return () => window.removeEventListener("mousedown", stopRecording);
+  }, [recording, stopRecording]);
 
   return (
-    <SettingsSection title="快捷键">
-      {bindings?.map((binding) => (
-        <ShortcutRow
-          key={binding.action}
-          binding={binding}
-          recording={recording === binding.action}
-          error={error?.action === binding.action ? error.message : undefined}
-          onRecordStart={() => startRecording(binding.action)}
-          onRecordCancel={stopRecording}
-        />
-      ))}
-    </SettingsSection>
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium text-muted-foreground">快捷键</h2>
+      <ScopeGroupCard scope="global">
+        {bindings?.map((binding) => (
+          <ShortcutRow
+            key={binding.action}
+            scope="global"
+            binding={binding}
+            recording={recording === binding.action}
+            error={error?.action === binding.action ? error.message : undefined}
+            onRecordStart={() => startRecording(binding.action)}
+          />
+        ))}
+      </ScopeGroupCard>
+    </section>
   );
 };
 

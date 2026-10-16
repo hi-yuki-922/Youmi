@@ -8,6 +8,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+import { isModifier } from "@/lib/kbd";
+
 export type ShortcutAction = "clipboard" | "palette" | "translate";
 
 /** 当前绑定（Rust `ShortcutBinding` camelCase 序列化）；registered = OS 注册是否生效。 */
@@ -54,71 +56,4 @@ export const onShortcutRecord = (
 
 /** 组合键是否满足修饰键约束：至少含 Ctrl / Alt / Win 之一（Shift 不算）。 */
 export const hasRequiredModifier = (combo: string): boolean =>
-  combo.split("+").some((part) => part === "ctrl" || part === "alt" || part === "super");
-
-const KEY_LABELS: Record<string, string> = {
-  Space: "Space",
-  Enter: "Enter",
-  Tab: "Tab",
-  Backspace: "Backspace",
-  Delete: "Del",
-  Insert: "Ins",
-  Home: "Home",
-  End: "End",
-  PageUp: "PgUp",
-  PageDown: "PgDn",
-  ArrowUp: "↑",
-  ArrowDown: "↓",
-  ArrowLeft: "←",
-  ArrowRight: "→",
-  Semicolon: ";",
-  Comma: ",",
-  Period: ".",
-  Slash: "/",
-  Backslash: "\\",
-  Quote: "'",
-  Backquote: "`",
-  BracketLeft: "[",
-  BracketRight: "]",
-  Minus: "-",
-  Equal: "=",
-  PrintScreen: "PrtSc",
-  ScrollLock: "ScrollLock",
-  CapsLock: "CapsLock",
-  NumLock: "NumLock",
-  NumpadAdd: "Num+",
-  NumpadSubtract: "Num-",
-  NumpadMultiply: "Num*",
-  NumpadDivide: "Num/",
-  NumpadDecimal: "Num.",
-  NumpadEnter: "NumEnter",
-  NumpadEqual: "Num=",
-};
-
-const keyLabel = (code: string): string => {
-  if (KEY_LABELS[code] !== undefined) return KEY_LABELS[code];
-  if (code.startsWith("Key")) return code.slice(3);
-  if (code.startsWith("Digit")) return code.slice(5);
-  if (code.startsWith("Numpad")) return `Num${code.slice(6)}`;
-  return code;
-};
-
-/** 组合键规范串 → 用户可读形式（如 "alt+KeyV" → "Alt+V"）。 */
-export const formatCombo = (combo: string): string =>
-  combo
-    .split("+")
-    .map((part) => {
-      switch (part) {
-        case "ctrl":
-          return "Ctrl";
-        case "alt":
-          return "Alt";
-        case "shift":
-          return "Shift";
-        case "super":
-          return "Win";
-        default:
-          return keyLabel(part);
-      }
-    })
-    .join("+");
+  combo.split("+").some((part) => isModifier(part) && part !== "shift");

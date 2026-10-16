@@ -11,6 +11,7 @@ UI 测试，以「脚本 + 实机验收清单」收口（各 ticket 文件内有
 | `verify-pasteback-main-window.ps1` | ticket 01：回帖进主窗口 JSON 输入框 + 剪贴板恢复 | dev 应用运行且带 CDP 插桩 |
 | `verify-overlay-modifier-cleanup.ps1` | ticket 03：呼出后残留 Alt/Win 键态清理 + ↓ 正常移动选择 | 同上；需交互式桌面会话（可建立前台窗口） |
 | （无脚本） | ticket 02：diff 滚动——已按 verify 记录在案执行（截图 `gui-test-screenshots/iter2-diff-*.png`） | 复跑用 CDP 或人工粘贴长文本 |
+| （无脚本） | tickets 04~06：Kbd 呈现（设置页/面板/剪贴板浮层）+ 图标按钮进入录制 + mousedown 取消——CDP 断言记录在各 ticket Comments（截图 `gui-test-screenshots/iter2-*-kbd.png`） | 复跑用 CDP |
 
 脚本保持 **纯 ASCII**：PowerShell 5.1 按 ANSI 解码无 BOM 脚本，中文注释会破坏解析。
 

@@ -4,7 +4,9 @@
 
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::VK_V;
-use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+use windows::Win32::UI::WindowsAndMessaging::{
+    IsIconic, SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW,
+};
 
 use crate::platform::{PastebackAccess, PlatformError};
 
@@ -25,6 +27,19 @@ impl PastebackAccess for WinPastebackAccess {
         unsafe { SetForegroundWindow(HWND(hwnd as *mut _)) }.as_bool()
     }
 
+    fn awaken_window(&self, hwnd: isize) -> bool {
+        let hwnd = HWND(hwnd as *mut _);
+        unsafe {
+            // 最小化时先还原（SW_SHOW 对最小化窗口只是解除隐藏，不还原尺寸）；
+            // 隐藏到托盘的主窗口用 SW_SHOW 显出。ShowWindow 结果不判定：
+            // 成败由紧随的 SetForegroundWindow 返回值守门
+            if IsIconic(hwnd).as_bool() {
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+            }
+            let _ = ShowWindow(hwnd, SW_SHOW);
+            SetForegroundWindow(hwnd).as_bool()
+        }
+    }
     fn send_paste(&self) -> Result<(), PlatformError> {
         send_ctrl_chord(VK_V)
     }

@@ -15,6 +15,8 @@ pub use windows::pasteback::WinPastebackAccess;
 #[cfg(windows)]
 pub use windows::record::WinShortcutRecorder;
 #[cfg(windows)]
+pub use windows::release_lingering_modifiers;
+#[cfg(windows)]
 pub use windows::secrets::WinSecretStore;
 #[cfg(windows)]
 pub use windows::selection::WinSelectionAccess;
@@ -69,6 +71,10 @@ pub trait PastebackAccess: Send + Sync {
 
     /// 把窗口带到前台；返回是否成功。
     fn set_foreground(&self, hwnd: isize) -> bool;
+
+    /// 唤起窗口：还原最小化、显示并置前台；返回是否成功置前台。
+    /// 回帖目标为本进程主窗口时用——主窗口可能最小化或隐藏在托盘。
+    fn awaken_window(&self, hwnd: isize) -> bool;
 
     /// 向当前前台窗口模拟 Ctrl+V 粘贴键击。
     fn send_paste(&self) -> Result<(), PlatformError>;

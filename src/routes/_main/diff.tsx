@@ -119,7 +119,10 @@ const DiffToolPage = () => {
       ) : (
         <FileDiff
           fileDiff={fileDiff}
-          className="min-h-0 flex-1 overflow-hidden rounded-md border"
+          // 滚动归 diff 库的内部 scroller：diffs-container 根元素即其垂直
+          // 滚动容器（库在其上监听 scroll 驱动虚拟化），这里只开纵向滚动 +
+          // 高度约束；overflow-hidden 会把库的滚动裁掉导致长内容不可滚
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto rounded-md border"
           options={{
             diffStyle: view,
             lineDiffType: "char",

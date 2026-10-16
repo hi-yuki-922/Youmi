@@ -1,8 +1,9 @@
 //! 回帖编排：浮层选中条目 → 条目写剪贴板（自家通道，不入史）→ 浮层隐藏、
 //! 焦点交还呼出浮层前的窗口 → 模拟 Ctrl+V → 延迟恢复用户原剪贴板。
 //!
-//! - 目标窗口在热键呼起浮层时捕获（`capture_current_target`）；自家窗口不作目标。
-//! - 无有效目标（托盘直启、目标已关闭、自家窗口）或焦点/键击失败时降级为
+//! - 目标窗口在热键呼起浮层时捕获（`capture_current_target`）：外部窗口与
+//!   本进程主窗口（先唤起再粘贴）都可作目标；浮层窗口不作目标。
+//! - 无有效目标（托盘直启、目标已关闭、浮层前台）或焦点/键击失败时降级为
 //!   "仅复制"：条目留在剪贴板供手动粘贴，不模拟键击。
 //! - 回帖成功后延迟恢复用户原剪贴板，恢复带序号守卫：延迟窗口内用户复制了
 //!   新内容则放弃恢复，保护新内容。
@@ -54,6 +55,8 @@ pub struct PastebackDeps {
     pub input: Arc<dyn PastebackAccess>,
     /// 呼出浮层时捕获的目标窗口；None 走降级。
     pub target: Option<isize>,
+    /// 本进程主窗口句柄；主窗口目标是合法回帖对象，回帖时先唤起。
+    pub main_window: Option<isize>,
     pub own_pid: u32,
     pub focus_settle: Duration,
     pub restore_delay: Duration,
@@ -87,7 +90,14 @@ pub fn run(
     };
 
     hide_overlay();
-    if !deps.input.set_foreground(target) {
+    // 主窗口目标可能最小化或隐藏在托盘：先唤起（还原、显示、置前台）；
+    // 外部窗口保持只置前台，不干扰其最小化/隐藏状态
+    let foregrounded = if deps.main_window == Some(target) {
+        deps.input.awaken_window(target)
+    } else {
+        deps.input.set_foreground(target)
+    };
+    if !foregrounded {
         eprintln!("youmi: 回帖聚焦目标窗口 {target:#x} 失败，降级为仅复制");
         return Ok(PastebackOutcome::CopiedOnly);
     }
@@ -105,10 +115,13 @@ pub fn run(
     Ok(PastebackOutcome::Pasted)
 }
 
-/// 目标有效性：窗口仍存在且不属于本进程（主窗口/浮层不是回帖对象）。
+/// 目标有效性：窗口仍存在，且为外部窗口或本进程主窗口（浮层不是回帖对象）。
 fn valid_target(deps: &PastebackDeps) -> Option<isize> {
-    deps.target
-        .filter(|hwnd| is_foreign_window(deps.input.as_ref(), *hwnd, deps.own_pid))
+    deps.target.filter(|hwnd| {
+        deps.input
+            .window_process(*hwnd)
+            .is_some_and(|pid| pid != deps.own_pid || Some(*hwnd) == deps.main_window)
+    })
 }
 
 /// 延迟恢复用户原剪贴板。序号守卫：剪贴板序号仍是回帖写入的那个，说明延迟
@@ -142,19 +155,36 @@ fn schedule_restore(
 }
 
 /// 捕获当前前台窗口为回帖目标（热键呼起浮层时调用）。
-/// 自家窗口（主窗口/浮层）与取不到的窗口记为无目标。
+/// 外部窗口与本进程主窗口记为目标；浮层窗口与其他自家窗口记为无目标。
 pub fn capture_current_target(app: &AppHandle) {
     let Some(state) = app.try_state::<PastebackState>() else {
         return; // 剪贴板引擎未初始化等场景：无目标，回帖时自然降级
     };
-    let target = capture_target(state.platform.as_ref(), std::process::id());
+    let main_window = main_window_hwnd(app);
+    let target = capture_target(state.platform.as_ref(), std::process::id(), main_window);
     *state.target.lock().unwrap() = target;
 }
 
-/// 捕获逻辑核心：前台窗口有效且非本进程才作为目标。
-fn capture_target(input: &dyn PastebackAccess, own_pid: u32) -> Option<isize> {
+/// 本进程主窗口句柄；窗口未创建（理论上不发生）时为 None。
+pub fn main_window_hwnd(app: &AppHandle) -> Option<isize> {
+    app.get_webview_window(crate::MAIN_WINDOW_LABEL)
+        .and_then(|window| window.hwnd().ok())
+        .map(|hwnd| hwnd.0 as isize)
+}
+
+/// 捕获逻辑核心：前台为外部窗口，或恰为本进程主窗口时作为目标；浮层前台
+/// （含固定浮层）记为无目标，恰好清掉过期目标。
+fn capture_target(
+    input: &dyn PastebackAccess,
+    own_pid: u32,
+    main_window: Option<isize>,
+) -> Option<isize> {
     let hwnd = input.foreground_window()?;
-    is_foreign_window(input, hwnd, own_pid).then_some(hwnd)
+    if is_foreign_window(input, hwnd, own_pid) {
+        return Some(hwnd);
+    }
+    // 自家窗口：仅主窗口可作回帖目标
+    (Some(hwnd) == main_window).then_some(hwnd)
 }
 
 /// 窗口存活且不属于本进程：回帖目标与捕获共用的有效性谓词。
@@ -249,6 +279,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Call {
         Focus(isize),
+        Awaken(isize),
         Paste,
     }
 
@@ -305,6 +336,17 @@ mod tests {
             }
         }
 
+        fn awaken_window(&self, hwnd: isize) -> bool {
+            let mut s = self.0.lock().unwrap();
+            s.calls.push(Call::Awaken(hwnd));
+            if s.focus_grants {
+                s.foreground = s.foreground_after_focus.unwrap_or(Some(hwnd));
+                true
+            } else {
+                false
+            }
+        }
+
         fn send_paste(&self) -> Result<(), PlatformError> {
             let mut s = self.0.lock().unwrap();
             s.calls.push(Call::Paste);
@@ -321,6 +363,9 @@ mod tests {
     const OWN_PID: u32 = 7;
     const TARGET: isize = 42;
     const FOREIGN_PID: u32 = 999;
+    /// 本进程主窗口与浮层窗口（句柄为任意非零值，归属本进程）。
+    const MAIN: isize = 100;
+    const OVERLAY: isize = 200;
 
     struct Harness {
         repo: Arc<ClipboardHistoryRepository>,
@@ -347,11 +392,22 @@ mod tests {
     }
 
     fn deps(h: &Harness, target: Option<isize>, restore_delay: Duration) -> PastebackDeps {
+        deps_toward(h, target, None, restore_delay)
+    }
+
+    /// `main_window` = 主窗口句柄（测试主窗口目标路径时传入）。
+    fn deps_toward(
+        h: &Harness,
+        target: Option<isize>,
+        main_window: Option<isize>,
+        restore_delay: Duration,
+    ) -> PastebackDeps {
         PastebackDeps {
             repo: Arc::clone(&h.repo),
             engine: Arc::clone(&h.engine),
             input: Arc::clone(&h.input) as Arc<dyn PastebackAccess>,
             target,
+            main_window,
             own_pid: OWN_PID,
             focus_settle: Duration::ZERO,
             restore_delay,
@@ -369,6 +425,17 @@ mod tests {
         restore_delay: Duration,
     ) -> Result<PastebackOutcome, String> {
         let d = deps(h, target, restore_delay);
+        let hides = Arc::clone(&h.hides);
+        super::run(&d, id, &move || *hides.lock().unwrap() += 1)
+    }
+
+    /// 主窗口目标路径：deps 携带主窗口句柄。
+    fn run_to_main(
+        h: &Harness,
+        target: Option<isize>,
+        id: i64,
+    ) -> Result<PastebackOutcome, String> {
+        let d = deps_toward(h, target, Some(MAIN), Duration::ZERO);
         let hides = Arc::clone(&h.hides);
         super::run(&d, id, &move || *hides.lock().unwrap() += 1)
     }
@@ -476,14 +543,74 @@ mod tests {
     }
 
     #[test]
-    fn pasteback_to_own_process_window_degrades_to_copy_only() {
-        let input = FakeInput::new(HashMap::from([(TARGET, OWN_PID)]));
+    fn pasteback_to_own_overlay_window_degrades_to_copy_only() {
+        // 浮层窗口即使存活也不作回帖目标（主窗口已知的情况下）
+        let input = FakeInput::new(HashMap::from([(OVERLAY, OWN_PID)]));
         let h = harness(input);
         h.repo
             .capture(&ClipboardContent::Text("hello".into()))
             .unwrap();
 
-        let outcome = run(&h, Some(TARGET), 1).unwrap();
+        let outcome = run_to_main(&h, Some(OVERLAY), 1).unwrap();
+
+        assert_eq!(outcome, PastebackOutcome::CopiedOnly);
+        assert!(h.input.calls().is_empty());
+    }
+
+    #[test]
+    fn pasteback_pastes_to_main_window_after_awakening() {
+        // 焦点本就在主窗口（呼出浮层前的前台是主窗口输入框）
+        let input = FakeInput::new(HashMap::from([(MAIN, OWN_PID)]))
+            .set_foreground_in(MAIN)
+            .grant_focus();
+        let h = harness(input);
+        h.repo
+            .capture(&ClipboardContent::Text("hello".into()))
+            .unwrap();
+        h.clip
+            .set_content(ClipboardContent::Text("user-content".into()));
+
+        let outcome = run_to_main(&h, Some(MAIN), 1).unwrap();
+
+        assert_eq!(outcome, PastebackOutcome::Pasted);
+        // 先唤起（还原/显示/置前台）再粘贴，不走外部窗口的 set_foreground
+        assert_eq!(h.input.calls(), vec![Call::Awaken(MAIN), Call::Paste]);
+        assert!(h
+            .clip
+            .writes()
+            .contains(&ClipboardContent::Text("hello".into())));
+        assert_eq!(history_texts(&h), vec!["hello".to_string()]);
+        let restored = wait_until(Duration::from_secs(2), || {
+            h.clip.content() == Some(ClipboardContent::Text("user-content".into()))
+        });
+        assert!(restored, "主窗口回帖后应恢复用户原剪贴板内容");
+    }
+
+    #[test]
+    fn pasteback_awaken_failure_degrades_to_copy_only() {
+        // 唤起失败（如前台锁）：不注入粘贴
+        let input = FakeInput::new(HashMap::from([(MAIN, OWN_PID)]));
+        let h = harness(input);
+        h.repo
+            .capture(&ClipboardContent::Text("hello".into()))
+            .unwrap();
+
+        let outcome = run_to_main(&h, Some(MAIN), 1).unwrap();
+
+        assert_eq!(outcome, PastebackOutcome::CopiedOnly);
+        assert_eq!(h.input.calls(), vec![Call::Awaken(MAIN)]);
+    }
+
+    #[test]
+    fn pasteback_to_closed_main_window_degrades_to_copy_only() {
+        // 记录的主窗口句柄已失效（进程归属解析不出）：照常降级
+        let input = FakeInput::new(HashMap::new()).set_foreground_in(MAIN);
+        let h = harness(input);
+        h.repo
+            .capture(&ClipboardContent::Text("hello".into()))
+            .unwrap();
+
+        let outcome = run_to_main(&h, Some(MAIN), 1).unwrap();
 
         assert_eq!(outcome, PastebackOutcome::CopiedOnly);
         assert!(h.input.calls().is_empty());
@@ -595,24 +722,53 @@ mod tests {
     fn capture_target_takes_foreign_foreground() {
         let input =
             FakeInput::new(HashMap::from([(TARGET, FOREIGN_PID)])).set_foreground_in(TARGET);
-        assert_eq!(super::capture_target(input.as_ref(), OWN_PID), Some(TARGET));
+        assert_eq!(
+            super::capture_target(input.as_ref(), OWN_PID, Some(MAIN)),
+            Some(TARGET)
+        );
     }
 
     #[test]
-    fn capture_target_rejects_own_windows() {
-        let input = FakeInput::new(HashMap::from([(TARGET, OWN_PID)])).set_foreground_in(TARGET);
-        assert_eq!(super::capture_target(input.as_ref(), OWN_PID), None);
+    fn capture_target_takes_main_window_foreground() {
+        let input = FakeInput::new(HashMap::from([(MAIN, OWN_PID)])).set_foreground_in(MAIN);
+        assert_eq!(
+            super::capture_target(input.as_ref(), OWN_PID, Some(MAIN)),
+            Some(MAIN)
+        );
+    }
+
+    #[test]
+    fn capture_target_rejects_overlay_windows() {
+        // 浮层前台（含固定浮层）不作目标：记为无目标，恰好清掉过期目标
+        let input = FakeInput::new(HashMap::from([(OVERLAY, OWN_PID)])).set_foreground_in(OVERLAY);
+        assert_eq!(
+            super::capture_target(input.as_ref(), OWN_PID, Some(MAIN)),
+            None
+        );
+    }
+
+    #[test]
+    fn capture_target_rejects_own_window_without_main() {
+        // 主窗口句柄取不到（窗口未创建等）：自家窗口一律不作目标
+        let input = FakeInput::new(HashMap::from([(MAIN, OWN_PID)])).set_foreground_in(MAIN);
+        assert_eq!(super::capture_target(input.as_ref(), OWN_PID, None), None);
     }
 
     #[test]
     fn capture_target_none_without_foreground() {
         let input = FakeInput::new(HashMap::new());
-        assert_eq!(super::capture_target(input.as_ref(), OWN_PID), None);
+        assert_eq!(
+            super::capture_target(input.as_ref(), OWN_PID, Some(MAIN)),
+            None
+        );
     }
 
     #[test]
     fn capture_target_rejects_dead_window() {
         let input = FakeInput::new(HashMap::new()).set_foreground_in(TARGET);
-        assert_eq!(super::capture_target(input.as_ref(), OWN_PID), None);
+        assert_eq!(
+            super::capture_target(input.as_ref(), OWN_PID, Some(MAIN)),
+            None
+        );
     }
 }

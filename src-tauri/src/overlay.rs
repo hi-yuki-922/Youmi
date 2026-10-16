@@ -106,7 +106,13 @@ pub fn toggle(app: &AppHandle, label: &str) -> tauri::Result<()> {
     } else {
         move_to_cursor_monitor(app, &window);
         window.show()?;
-        window.set_focus()
+        window.set_focus()?;
+        // 全局快捷键触发瞬间用户往往仍按着修饰键，不清掉的话浮层内按 ↓
+        // 会带着 Alt 残留误开系统窗口菜单（清理原语与回帖/取词路径共用）
+        if let Err(e) = crate::platform::release_lingering_modifiers() {
+            eprintln!("youmi: 清理浮层残留修饰键失败: {e}");
+        }
+        Ok(())
     }
 }
 

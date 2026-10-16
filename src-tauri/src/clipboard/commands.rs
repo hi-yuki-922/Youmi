@@ -119,6 +119,7 @@ pub async fn clipboard_pasteback(
         engine: Arc::clone(&state.engine),
         input: Arc::clone(&pasteback.platform),
         target: *pasteback.target.lock().unwrap(),
+        main_window: pasteback::main_window_hwnd(&app),
         own_pid: std::process::id(),
         focus_settle: pasteback::FOCUS_SETTLE,
         restore_delay: pasteback::RESTORE_DELAY,

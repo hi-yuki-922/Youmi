@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   base64ToText,
   dataUriToSvg,
+  normalizeIconName,
   paramsToQuery,
   parseQuery,
+  svgIconScss,
   svgToDataUri,
   textToBase64,
 } from "./core";
@@ -72,6 +74,58 @@ describe("dataUriToSvg", () => {
     const svg = '<svg xmlns="http://www.w3.org/2000/svg">中文 "引号" & 😀</svg>';
     const result = dataUriToSvg(svgToDataUri(svg));
     expect(result).toEqual({ ok: true, value: svg });
+  });
+});
+
+describe("normalizeIconName", () => {
+  it("空值与纯空白回退默认名 icon", () => {
+    expect(normalizeIconName("")).toBe("icon");
+    expect(normalizeIconName("   ")).toBe("icon");
+  });
+
+  it("空白折叠为连字符", () => {
+    expect(normalizeIconName("my icon")).toBe("my-icon");
+    expect(normalizeIconName("  spaced  name ")).toBe("spaced-name");
+  });
+
+  it("类名非法字符替换为连字符（含中文字符）", () => {
+    expect(normalizeIconName("a.b/c!")).toBe("a-b-c-");
+    expect(normalizeIconName("箭头")).toBe("--");
+  });
+
+  it("数字开头补 icon- 前缀，避免非法 CSS 类名", () => {
+    expect(normalizeIconName("42icon")).toBe("icon-42icon");
+  });
+
+  it("合法名称原样保留", () => {
+    expect(normalizeIconName("arrow-left_2")).toBe("arrow-left_2");
+  });
+});
+
+describe("svgIconScss", () => {
+  it("生成 iconify 风格片段：@include icon 固定，--svg 指向 data URI", () => {
+    const dataUri = svgToDataUri('<svg width="8" height="8"/>');
+    expect(svgIconScss(dataUri, "menu")).toBe(
+      `.menu {\n  @include icon;\n  --svg: url("${dataUri}");\n}`,
+    );
+  });
+
+  it("空 iconName 注入默认名 icon", () => {
+    expect(svgIconScss("data:image/svg+xml,%3Csvg%3E", "")).toBe(
+      '.icon {\n  @include icon;\n  --svg: url("data:image/svg+xml,%3Csvg%3E");\n}',
+    );
+  });
+
+  it("特殊字符的 iconName 规范化后注入，不破坏 scss 结构", () => {
+    const template = svgIconScss("data:image/svg+xml,x", "my icon!");
+    expect(template).toBe(
+      '.my-icon- {\n  @include icon;\n  --svg: url("data:image/svg+xml,x");\n}',
+    );
+  });
+
+  it("data URI 原样嵌入（其中无未转义引号）", () => {
+    const dataUri = svgToDataUri(`<svg>it's "q" & more</svg>`);
+    expect(svgIconScss(dataUri, "q")).toContain(`--svg: url("${dataUri}");`);
   });
 });
 

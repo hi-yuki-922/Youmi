@@ -173,8 +173,11 @@ impl VaultState {
     }
 
     /// 无操作超过锁定超时即落锁；返回本次调用是否恰好触发了落锁
-    /// （供自动锁定线程发事件用，避免重复通知）。
+    /// （供自动锁定线程发事件用，避免重复通知）。锁定超时为 0（永不）时恒不落锁。
     pub fn expire_if_due(&self) -> bool {
+        if self.timeout_secs.load(Ordering::Relaxed) == 0 {
+            return false;
+        }
         let mut session = self.session.lock().unwrap();
         let Some(s) = session.as_ref() else {
             return false;
@@ -396,10 +399,14 @@ pub fn vault_lock(state: State<'_, VaultState>) -> Result<(), String> {
     Ok(())
 }
 
-/// 锁定超时（秒），约束到 10 秒～24 小时。
+/// 锁定超时（秒）：0 = 永不自动锁定；非零值约束到 10 秒～24 小时。
 #[tauri::command]
 pub fn vault_set_lock_timeout(state: State<'_, VaultState>, seconds: u64) -> Result<(), String> {
-    state.set_lock_timeout(seconds.clamp(10, 86_400));
+    state.set_lock_timeout(if seconds == 0 {
+        0
+    } else {
+        seconds.clamp(10, 86_400)
+    });
     Ok(())
 }
 
@@ -647,18 +654,42 @@ mod tests {
 
     #[test]
     fn idle_session_auto_locks_after_timeout() {
-        // 超时 0 秒 = 任何后续操作前都已到期
-        let h = harness(0, true);
+        let h = harness(1, true);
         h.state.setup(MASTER).unwrap();
-        // expire_if_due 只在到期落锁那一刻返回 true：再次调用不再触发
-        assert!(h.state.expire_if_due());
-        assert!(!h.state.expire_if_due());
-        assert!(!h.state.status().unlocked);
+        assert!(h.state.status().unlocked);
+
+        // 无操作超过超时（1 秒）后，命令路径与状态查询都会到期落锁
+        let expired = wait_until(Duration::from_secs(2), || !h.state.status().unlocked);
+        assert!(expired, "闲置超过锁定超时后应自动落锁");
+        assert!(matches!(h.state.query(""), Err(VaultError::Locked)));
 
         // 调大超时后重新解锁，会话恢复正常
         h.state.set_lock_timeout(300);
         h.state.unlock(MASTER).unwrap();
         assert!(h.state.status().unlocked);
+    }
+
+    #[test]
+    fn zero_timeout_never_auto_locks() {
+        // 0 = 永不自动锁定：命令路径的到期检查恒不过期，闲置再久会话仍在
+        let h = harness(0, true);
+        h.state.setup(MASTER).unwrap();
+        assert!(!h.state.expire_if_due());
+        assert!(h.state.status().unlocked);
+        // 会话未过期：条目操作照常可用
+        h.state.create(&sample("GitHub")).unwrap();
+        assert_eq!(h.state.query("").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn manual_lock_works_with_zero_timeout() {
+        let h = harness(0, true);
+        h.state.setup(MASTER).unwrap();
+
+        h.state.lock();
+
+        assert!(!h.state.status().unlocked);
+        assert!(matches!(h.state.query(""), Err(VaultError::Locked)));
     }
 
     // ---------- 条目 CRUD 与搜索 ----------

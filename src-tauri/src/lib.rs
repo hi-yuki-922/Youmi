@@ -163,6 +163,8 @@ fn setup_vault(app: &tauri::App) {
 
 /// 自动锁定哨兵：解锁会话到期（无操作超过锁定超时）即落锁并通知主窗口，
 /// 前端收到事件切回解锁界面。命令路径自带到期检查，哨兵负责界面联动。
+/// 锁定超时为 0（永不）时 expire_if_due 恒不触发——超时可在运行时改回
+/// 非零，线程保持空转而不按值启停。
 fn spawn_vault_autolock(app: tauri::AppHandle) {
     let spawned = std::thread::Builder::new()
         .name("vault-autolock".into())

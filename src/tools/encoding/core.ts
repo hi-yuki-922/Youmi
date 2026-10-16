@@ -47,6 +47,23 @@ export const dataUriToSvg = (input: string): ConvertResult<string> => {
   }
 };
 
+/** iconName 规范化为 scss 类名：空白折叠为连字符，类名非法字符替换为连字符；空值回退 icon。 */
+export const normalizeIconName = (iconName: string): string => {
+  const name = iconName
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^A-Za-z0-9_-]/g, "-");
+  if (name === "") return "icon";
+  // CSS 类名不能以数字开头
+  return /^[0-9]/.test(name) ? `icon-${name}` : name;
+};
+
+/** SVG 图标的 iconify 风格 scss 片段：类名内联 @include icon，--svg 指向 data URI。 */
+export const svgIconScss = (dataUri: string, iconName: string): string => {
+  const name = normalizeIconName(iconName);
+  return `.${name} {\n  @include icon;\n  --svg: url("${dataUri}");\n}`;
+};
+
 /**
  * 文本 → Base64（UTF-8）。恒成功。
  * 分块拼接二进制串，避免长文本展开参数栈溢出。

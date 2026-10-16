@@ -12,6 +12,10 @@ UI 测试，以「脚本 + 实机验收清单」收口（各 ticket 文件内有
 | `verify-overlay-modifier-cleanup.ps1` | ticket 03：呼出后残留 Alt/Win 键态清理 + ↓ 正常移动选择 | 同上；需交互式桌面会话（可建立前台窗口） |
 | （无脚本） | ticket 02：diff 滚动——已按 verify 记录在案执行（截图 `gui-test-screenshots/iter2-diff-*.png`） | 复跑用 CDP 或人工粘贴长文本 |
 | （无脚本） | tickets 04~06：Kbd 呈现（设置页/面板/剪贴板浮层）+ 图标按钮进入录制 + mousedown 取消——CDP 断言记录在各 ticket Comments（截图 `gui-test-screenshots/iter2-*-kbd.png`） | 复跑用 CDP |
+| （无脚本） | tickets 07~09：工具页状态跨路由/重启保留与空态不复活、清空按钮联动、SVG 预览与模板复制——实现完成待 CDP/实机复验（清单见各 ticket） | 复跑用 CDP 或人工 |
+| （无脚本） | ticket 10：ScrollArea 滚动样式统一、无双重滚动、滚轮/键盘滚动——实现完成待实机目检 | 人工目检 |
+| （无脚本） | ticket 11：锁定超时 0=永不（长放置不锁定、手动锁定正常、1..1440 不回归）——cargo test 覆盖语义，实机行为待复验 | 人工（长等待场景） |
+| （无脚本） | ticket 12：浮层内 Alt+1~5 快速回帖（含过滤后）、数字角标、搜索框焦点生效、全局无注册——键击注入按惯例留实机清单 | 复跑用 CDP `Input.dispatchKeyEvent` 或人工 |
 
 脚本保持 **纯 ASCII**：PowerShell 5.1 按 ANSI 解码无 BOM 脚本，中文注释会破坏解析。
 

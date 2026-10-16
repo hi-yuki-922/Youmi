@@ -16,7 +16,7 @@ import {
   type ClipboardEntry,
   type ClipboardKind,
 } from "@/lib/clipboard";
-import { formatEntryTime } from "@/tools/clipboard/core";
+import { formatEntryTime, QUICK_PASTEBACK_SLOTS } from "@/tools/clipboard/core";
 
 type KindFilter = "all" | ClipboardKind;
 
@@ -28,6 +28,9 @@ const CLEAR_CONFIRM_TIMEOUT_MS = 3000;
 
 /** 进入确认态后忽略点击的窗口：原地快速双击不该等于确认。 */
 const CLEAR_CONFIRM_GRACE_MS = 400;
+
+/** Alt+数字快速回帖的按键匹配：主键盘区数字行。 */
+const QUICK_SLOT_CODE = new RegExp(`^Digit([1-${QUICK_PASTEBACK_SLOTS}])$`);
 
 const KIND_FILTER_OPTIONS: ReadonlyArray<{ id: KindFilter; label: string }> = [
   { id: "all", label: "全部" },
@@ -114,6 +117,23 @@ const ClipboardOverlay = () => {
 
   const entries = entriesQuery.data ?? [];
 
+  // Alt+1~5 快速回帖当前可见列表的前五条：仅本浮层窗口内的前端键盘监听，
+  // 不注册全局快捷键、不占全局改键表；Alt 组合不产生字符输入，焦点在
+  // 搜索框时同样生效。行为等同双击回帖。
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.shiftKey || event.metaKey) return;
+      const match = QUICK_SLOT_CODE.exec(event.code);
+      if (!match) return;
+      const entry = entries[Number(match[1]) - 1];
+      if (!entry) return;
+      event.preventDefault();
+      pasteback(entry.id);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [entries, pasteback]);
+
   // 清空作用于全库而非当前过滤结果：入口显隐跟随未过滤历史是否非空
   const hasAnyQuery = useQuery({
     queryKey: ["clipboard-entries", "any"],
@@ -164,10 +184,11 @@ const ClipboardOverlay = () => {
         <EmptyState keyword={deferredKeyword} kind={kind} />
       ) : (
         <ul ref={listRef} className="flex-1 overflow-y-auto">
-          {entries.map((entry) => (
+          {entries.map((entry, index) => (
             <EntryRow
               key={entry.id}
               entry={entry}
+              quickPastebackSlot={index < QUICK_PASTEBACK_SLOTS ? index + 1 : undefined}
               onPaste={() => pasteback(entry.id)}
               onDelete={() => deleteMutation.mutate(entry.id)}
             />
@@ -182,6 +203,10 @@ const ClipboardOverlay = () => {
         <span>·</span>
         <Kbd>⏎</Kbd>
         <span>或双击回帖到之前的窗口</span>
+        <span>·</span>
+        <Kbd>⌘</Kbd>
+        <Kbd>1~5</Kbd>
+        <span>回帖前五条</span>
       </p>
     </div>
   );
@@ -269,10 +294,13 @@ const ClearHistoryButton = ({ onClear, pending }: { onClear: () => void; pending
 
 const EntryRow = ({
   entry,
+  quickPastebackSlot,
   onPaste,
   onDelete,
 }: {
   entry: ClipboardEntry;
+  /** 该行在 Alt+1~5 快速回帖中的槽位（1~5），越出前五行的行不显示。 */
+  quickPastebackSlot?: number;
   onPaste: () => void;
   onDelete: () => void;
 }) => {
@@ -294,6 +322,11 @@ const EntryRow = ({
       }}
       className="group flex cursor-default items-center gap-3 border-b px-4 py-2.5 last:border-b-0 focus:bg-accent/70 focus:outline-none hover:bg-accent/50"
     >
+      {quickPastebackSlot !== undefined && (
+        <Kbd aria-label={`Alt+${quickPastebackSlot}`} className="shrink-0">
+          {quickPastebackSlot}
+        </Kbd>
+      )}
       <div className="min-w-0 flex-1">
         {entry.kind === "image" ? (
           <ImageThumb id={entry.id} updatedAt={entry.updatedAt} />

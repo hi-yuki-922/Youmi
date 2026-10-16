@@ -71,9 +71,19 @@ export const onVaultLocked = (handler: () => void): Promise<() => void> =>
 
 export const VAULT_LOCK_TIMEOUT_DEFAULT_MINUTES = 5;
 const VAULT_LOCK_TIMEOUT_KEY = "vault.lockTimeoutMinutes";
-/** 设置页输入的分钟数范围；Rust 侧另有 10 秒～24 小时的兜底 clamp。 */
-const VAULT_LOCK_TIMEOUT_MIN_MINUTES = 1;
+/** 设置页输入的分钟数范围：0 = 永不自动锁定；Rust 侧对非零值另有 10 秒～24 小时的兜底 clamp。 */
+const VAULT_LOCK_TIMEOUT_MIN_MINUTES = 0;
 const VAULT_LOCK_TIMEOUT_MAX_MINUTES = 24 * 60;
+
+/**
+ * 分钟数钳制到 0..1440：小数向上取整（0.5 → 1 分钟，避免被误归为 0 = 永不），
+ * 0 保留为永不自动锁定。
+ */
+export const clampLockTimeoutMinutes = (minutes: number): number =>
+  Math.min(
+    Math.max(Math.ceil(minutes), VAULT_LOCK_TIMEOUT_MIN_MINUTES),
+    VAULT_LOCK_TIMEOUT_MAX_MINUTES,
+  );
 
 /** 锁定超时（分钟）：无操作该时长后自动落锁；未设置过时返回默认值。 */
 export const getVaultLockTimeoutMinutes = (): Promise<number> =>
@@ -85,10 +95,7 @@ const applyLockTimeoutSeconds = (seconds: number): Promise<void> =>
 
 /** 修改锁定超时并立即生效（应用到 Rust 会话），同时持久化。 */
 export const setVaultLockTimeoutMinutes = async (minutes: number): Promise<void> => {
-  const clamped = Math.min(
-    Math.max(Math.floor(minutes), VAULT_LOCK_TIMEOUT_MIN_MINUTES),
-    VAULT_LOCK_TIMEOUT_MAX_MINUTES,
-  );
+  const clamped = clampLockTimeoutMinutes(minutes);
   await applyLockTimeoutSeconds(clamped * 60);
   await setSetting(VAULT_LOCK_TIMEOUT_KEY, clamped);
 };

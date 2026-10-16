@@ -1,8 +1,9 @@
 import { parseDiffFromFile, type FileContents } from "@pierre/diffs";
 import { FileDiff } from "@pierre/diffs/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo } from "react";
 
+import { ClearButton } from "@/components/ClearButton";
 import { LabeledTextarea } from "@/components/ui/LabeledTextarea";
 import {
   Select,
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/Select";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { restoreOneOf, restoreString, usePersistedToolState } from "@/lib/tool-state";
 
 const VIEW_OPTIONS = [
   { id: "split", label: "并排" },
@@ -46,11 +48,15 @@ type LanguageId = (typeof LANGUAGES)[number]["value"];
 const toFileContents = (name: string, contents: string, lang: LanguageId): FileContents =>
   lang === "text" ? { name, contents } : { name, contents, lang };
 
+const restoreView = restoreOneOf(VIEW_OPTIONS.map((option) => option.id));
+
+const restoreLang = restoreOneOf(LANGUAGES.map((language) => language.value));
+
 const DiffToolPage = () => {
-  const [view, setView] = useState<ViewId>("split");
-  const [lang, setLang] = useState<LanguageId>("text");
-  const [oldText, setOldText] = useState("");
-  const [newText, setNewText] = useState("");
+  const [view, setView] = usePersistedToolState<ViewId>("diff.view", "split", restoreView);
+  const [lang, setLang] = usePersistedToolState<LanguageId>("diff.lang", "text", restoreLang);
+  const [oldText, setOldText] = usePersistedToolState("diff.old", "", restoreString);
+  const [newText, setNewText] = usePersistedToolState("diff.new", "", restoreString);
   const langSelectId = useId();
 
   const fileDiff = useMemo(
@@ -103,12 +109,26 @@ const DiffToolPage = () => {
           value={oldText}
           onChange={(event) => setOldText(event.target.value)}
           placeholder="粘贴原文本"
+          action={
+            <ClearButton
+              label="清空原文本"
+              onClick={() => setOldText("")}
+              disabled={oldText === ""}
+            />
+          }
         />
         <LabeledTextarea
           label="新文本"
           value={newText}
           onChange={(event) => setNewText(event.target.value)}
           placeholder="粘贴新文本"
+          action={
+            <ClearButton
+              label="清空新文本"
+              onClick={() => setNewText("")}
+              disabled={newText === ""}
+            />
+          }
         />
       </div>
 

@@ -31,6 +31,7 @@ import {
   setTranslateModel,
 } from "@/lib/translate";
 import { getVaultLockTimeoutMinutes, setVaultLockTimeoutMinutes } from "@/lib/vault";
+import { QUICK_PASTEBACK_SLOTS } from "@/tools/clipboard/core";
 
 const SettingsSection = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className="flex flex-col gap-2">
@@ -137,6 +138,17 @@ const SHORTCUT_DESCRIPTIONS: Record<ShortcutAction, string> = {
   palette: "呼出/收起命令面板；呼不出时通常是组合键被其他程序占用",
   translate: "选中文字后呼出划词翻译；呼不出时通常是组合键被其他程序占用",
 };
+
+/** 剪贴板浮层内生效的只读快捷键：Alt+1~N 直达回帖，不经系统注册、不可改键。 */
+const CLIPBOARD_SCOPE_SHORTCUTS: ReadonlyArray<{
+  combo: string;
+  title: string;
+  description: string;
+}> = Array.from({ length: QUICK_PASTEBACK_SLOTS }, (_, i) => i + 1).map((n) => ({
+  combo: `alt+Digit${n}`,
+  title: `回帖第 ${n} 条`,
+  description: `快速回帖浮层内当前可见（含搜索过滤后）列表的第 ${n} 条`,
+}));
 
 /** 快捷键生效作用域：全局 = 系统级注册、任意应用生效；剪贴板 = 浮层窗口内生效。 */
 type ShortcutScope = "global" | "clipboard";
@@ -301,6 +313,17 @@ const ShortcutsSection = () => {
           />
         ))}
       </ScopeGroupCard>
+      <ScopeGroupCard scope="clipboard">
+        {CLIPBOARD_SCOPE_SHORTCUTS.map(({ combo, title, description }) => (
+          <SettingRow
+            key={combo}
+            title={title}
+            tag={SCOPE_META.clipboard.label}
+            description={description}
+            control={<ComboKbd combo={combo} />}
+          />
+        ))}
+      </ScopeGroupCard>
     </section>
   );
 };
@@ -376,7 +399,7 @@ const ClipboardCapacityRow = () => {
   );
 };
 
-/** 锁定超时输入失焦/回车才提交；以后端 clamp 后的值回显，非法输入恢复原值。 */
+/** 锁定超时输入失焦/回车才提交；以后端 clamp 后的值回显，非法输入恢复原值。0 = 永不自动锁定。 */
 const VaultLockTimeoutRow = () => {
   const [value, setValue] = useState("");
   const [committed, setCommitted] = useState<number | null>(null);
@@ -398,7 +421,8 @@ const VaultLockTimeoutRow = () => {
   const commit = async () => {
     if (!ready) return;
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 1) {
+    // 0 = 永不自动锁定；负数或非数字恢复原值，区间钳制交给持久化层
+    if (!Number.isFinite(parsed) || parsed < 0) {
       setValue(String(committed));
       return;
     }
@@ -414,15 +438,21 @@ const VaultLockTimeoutRow = () => {
     }
   };
 
+  const never = committed === 0;
+
   return (
     <SettingRow
       title="锁定超时"
-      description="无操作该时长后自动锁定密码本"
+      description={
+        never
+          ? "永不自动锁定，需要时在密码本页手动落锁"
+          : "无操作该时长后自动锁定密码本；输入 0 表示永不"
+      }
       control={
         <div className="flex items-center gap-2">
           <Input
             type="number"
-            min={1}
+            min={0}
             value={value}
             disabled={!ready}
             onChange={(e) => setValue(e.target.value)}
@@ -432,7 +462,7 @@ const VaultLockTimeoutRow = () => {
             }}
             className="w-24 text-right"
           />
-          <span className="text-sm text-muted-foreground">分钟</span>
+          <span className="text-sm text-muted-foreground">{never ? "永不" : "分钟"}</span>
         </div>
       }
     />

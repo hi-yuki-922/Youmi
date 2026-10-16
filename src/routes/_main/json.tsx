@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 
+import { ClearButton } from "@/components/ClearButton";
 import { CopyButton } from "@/components/CopyButton";
 import { Button } from "@/components/ui/Button";
 import { FeedbackStrip } from "@/components/ui/FeedbackStrip";
+import { LabeledTextarea } from "@/components/ui/LabeledTextarea";
 import {
   Select,
   SelectContent,
@@ -11,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+import { restoreString, usePersistedToolState } from "@/lib/tool-state";
 import {
   escapeToJsonString,
   formatJson,
@@ -34,11 +35,31 @@ const failureToStatus = (failure: JsonFailure): Status => ({
   column: failure.column,
 });
 
+const restoreIndent = (value: unknown): JsonIndent | undefined =>
+  value === 2 || value === 4 || value === "tab" ? value : undefined;
+
+const restoreStatus = (value: unknown): Status | undefined => {
+  if (typeof value !== "object" || value === null) return undefined;
+  const record = value as { kind?: unknown; text?: unknown; line?: unknown; column?: unknown };
+  if (record.kind === "idle") return { kind: "idle" };
+  if (record.kind !== "success" && record.kind !== "error") return undefined;
+  if (typeof record.text !== "string") return undefined;
+  const line = typeof record.line === "number" ? record.line : undefined;
+  const column = typeof record.column === "number" ? record.column : undefined;
+  return record.kind === "success"
+    ? { kind: "success", text: record.text }
+    : { kind: "error", text: record.text, line, column };
+};
+
 const JsonToolPage = () => {
-  const [input, setInput] = useState("");
-  const [output, setOutput] = useState("");
-  const [indent, setIndent] = useState<JsonIndent>(2);
-  const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [input, setInput] = usePersistedToolState("json.input", "", restoreString);
+  const [output, setOutput] = usePersistedToolState("json.output", "", restoreString);
+  const [indent, setIndent] = usePersistedToolState<JsonIndent>("json.indent", 2, restoreIndent);
+  const [status, setStatus] = usePersistedToolState<Status>(
+    "json.status",
+    { kind: "idle" },
+    restoreStatus,
+  );
 
   const runTransform = (
     transform: () => { ok: true; value: string } | JsonFailure,
@@ -62,6 +83,13 @@ const JsonToolPage = () => {
   const handleValidate = () => {
     const result = validateJson(input);
     setStatus(result.ok ? { kind: "success", text: "JSON 合法" } : failureToStatus(result));
+  };
+
+  // 输入清空联动输出与状态条：旧输入的结果不再有意义
+  const clearInput = () => {
+    setInput("");
+    setOutput("");
+    setStatus({ kind: "idle" });
   };
 
   return (
@@ -112,32 +140,14 @@ const JsonToolPage = () => {
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
-        <div className="flex min-h-0 flex-col gap-2">
-          <label htmlFor="json-input" className="text-sm font-medium text-muted-foreground">
-            输入
-          </label>
-          <Textarea
-            id="json-input"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder="粘贴或输入 JSON 文本"
-            className="min-h-0 flex-1 resize-none font-mono text-sm"
-            spellCheck={false}
-          />
-        </div>
-        <div className="flex min-h-0 flex-col gap-2">
-          <label htmlFor="json-output" className="text-sm font-medium text-muted-foreground">
-            输出
-          </label>
-          <Textarea
-            id="json-output"
-            value={output}
-            readOnly
-            placeholder="结果将显示在这里"
-            className="min-h-0 flex-1 resize-none font-mono text-sm"
-            spellCheck={false}
-          />
-        </div>
+        <LabeledTextarea
+          label="输入"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="粘贴或输入 JSON 文本"
+          action={<ClearButton label="清空输入" onClick={clearInput} disabled={input === ""} />}
+        />
+        <LabeledTextarea label="输出" value={output} readOnly placeholder="结果将显示在这里" />
       </div>
     </div>
   );

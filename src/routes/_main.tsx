@@ -3,6 +3,7 @@ import { useEffect } from "react";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TitleBar } from "@/components/layout/TitleBar";
+import { ScrollArea } from "@/components/ui/ScrollArea";
 import { applyClipboardCapacity } from "@/lib/clipboard";
 import { onOpenTool } from "@/lib/palette";
 import { TOOLS } from "@/lib/tools";
@@ -41,9 +42,9 @@ const MainLayout = () => {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 px-2 pb-2">
-          <div className="h-full overflow-y-auto rounded-lg border bg-card shadow-xs">
+          <ScrollArea className="h-full rounded-lg border bg-card shadow-xs">
             <Outlet />
-          </div>
+          </ScrollArea>
         </main>
       </div>
     </div>

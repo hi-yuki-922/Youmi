@@ -6,9 +6,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { setOverlayPinned } from "@/lib/overlay";
-import { getTranslateApiKey, getTranslateModel, streamTranslate } from "@/lib/translate";
+import { useTranslateStream } from "@/lib/translate";
 import { cn } from "@/lib/utils";
 import {
+  buildTranslatePrompt,
   isTranslatable,
   TRANSLATE_DIRECTIONS,
   type TranslateDirection,
@@ -22,69 +23,28 @@ const SELECTION_EVENT = "translate-selection";
 const TranslateOverlay = () => {
   const [direction, setDirection] = useState<TranslateDirection>("auto-to-zh");
   const [source, setSource] = useState("");
-  const [output, setOutput] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [streaming, setStreaming] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const { output, error, setError, streaming, run, stop, reset } = useTranslateStream();
 
-  const abortRef = useRef<AbortController | null>(null);
   // 事件订阅只挂一次：经 ref 取当前方向，新取词始终按最新方向翻译
   const directionRef = useRef(direction);
 
-  const stopStream = () => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-  };
-
-  const translate = async (text: string, to: TranslateDirection) => {
-    stopStream();
+  const translate = (text: string, to: TranslateDirection) => {
+    stop();
     if (!isTranslatable(text)) return;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setOutput("");
-    setError(null);
-    setStreaming(true);
-    try {
-      const apiKey = await getTranslateApiKey();
-      if (!apiKey) {
-        setError("未配置 DeepSeek API Key，请在主窗口「设置 → 划词翻译」填写");
-        return;
-      }
-      const model = await getTranslateModel();
-      await streamTranslate({
-        apiKey,
-        model,
-        text,
-        direction: to,
-        signal: controller.signal,
-        onDelta: (delta) => setOutput((prev) => prev + delta),
-      });
-    } catch (cause) {
-      // 换方向/新取词触发的中止不是失败
-      if (!controller.signal.aborted) {
-        console.error("翻译请求失败", cause);
-        setError(cause instanceof Error ? cause.message : String(cause));
-      }
-    } finally {
-      if (abortRef.current === controller) {
-        abortRef.current = null;
-        setStreaming(false);
-      }
-    }
+    void run(buildTranslatePrompt(text, to));
   };
 
   // 浮层 hide 而非销毁：每次取词事件都是一轮新翻译；Esc 隐藏窗口。
   // 订阅只挂一次，translate 经 directionRef 读取最新方向，不进依赖。
   useEffect(() => {
     const unlisten = listen<SelectionEventPayload>(SELECTION_EVENT, (event) => {
-      stopStream();
-      setStreaming(false);
       if (event.payload.kind === "text") {
         setSource(event.payload.text);
-        void translate(event.payload.text, directionRef.current);
+        translate(event.payload.text, directionRef.current);
       } else {
+        reset();
         setSource("");
-        setOutput("");
         setError(event.payload.message);
       }
     });
@@ -93,7 +53,7 @@ const TranslateOverlay = () => {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      stopStream();
+      stop();
       window.removeEventListener("keydown", onKeyDown);
       void unlisten.then((dispose) => dispose());
     };
@@ -102,7 +62,7 @@ const TranslateOverlay = () => {
   const changeDirection = (next: TranslateDirection) => {
     setDirection(next);
     directionRef.current = next;
-    if (isTranslatable(source)) void translate(source, next);
+    if (isTranslatable(source)) translate(source, next);
   };
 
   const togglePinned = () => {

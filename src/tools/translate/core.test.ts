@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTranslatePrompt, isTranslatable, TRANSLATE_DIRECTIONS } from "./core";
+import {
+  buildTranslatePairPrompt,
+  buildTranslatePrompt,
+  isTranslatable,
+  TRANSLATE_DIRECTIONS,
+} from "./core";
 
 describe("TRANSLATE_DIRECTIONS", () => {
   it("首项为默认方向自动→中文，标签唯一", () => {
@@ -36,6 +41,30 @@ describe("buildTranslatePrompt", () => {
 
   it("系统提示要求只输出译文", () => {
     const { system } = buildTranslatePrompt("hello", "auto-to-zh");
+    expect(system).toMatch(/ONLY/i);
+    expect(system).toContain("no explanations");
+  });
+});
+
+describe("buildTranslatePairPrompt", () => {
+  it("语言对与划词固定方向同构（en→zh ≡ en-to-zh）", () => {
+    expect(buildTranslatePairPrompt("hello", "en", "zh").system).toBe(
+      buildTranslatePrompt("hello", "en-to-zh").system,
+    );
+  });
+
+  it("语言对与划词固定方向同构（zh→en ≡ zh-to-en）", () => {
+    expect(buildTranslatePairPrompt("你好", "zh", "en").system).toBe(
+      buildTranslatePrompt("你好", "zh-to-en").system,
+    );
+  });
+
+  it("原文作为 user 消息原样传递", () => {
+    expect(buildTranslatePairPrompt("hello", "en", "zh").prompt).toBe("hello");
+  });
+
+  it("系统提示要求只输出译文", () => {
+    const { system } = buildTranslatePairPrompt("hello", "zh", "en");
     expect(system).toMatch(/ONLY/i);
     expect(system).toContain("no explanations");
   });

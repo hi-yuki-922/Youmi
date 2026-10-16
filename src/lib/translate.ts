@@ -1,15 +1,17 @@
 /**
- * 划词翻译的 tauri 边界：DeepSeek 配置与流式请求。
+ * DeepSeek 流式翻译的 tauri 边界（划词翻译浮层与主窗口翻译页共用）。
  * API key 存系统凭据库（Rust command）；模型名存设置文件（非秘密）。
+ * 提示词由 `tools/translate/core` 构造后传入，本模块只管传输。
  */
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { invoke } from "@tauri-apps/api/core";
 import { streamText } from "ai";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { useEffect, useRef, useState } from "react";
 
 import { getSetting, setSetting } from "@/lib/settings";
-import { buildTranslatePrompt, type TranslateDirection } from "@/tools/translate/core";
+import type { TranslatePrompt } from "@/tools/translate/core";
 
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
 const MODEL_KEY = "translate.model";
@@ -35,8 +37,7 @@ export const setTranslateApiKey = (key: string): Promise<void> =>
 export interface StreamTranslateParams {
   apiKey: string;
   model: string;
-  text: string;
-  direction: TranslateDirection;
+  prompt: TranslatePrompt;
   signal?: AbortSignal;
   onDelta: (delta: string) => void;
 }
@@ -48,8 +49,7 @@ export interface StreamTranslateParams {
 export const streamTranslate = async ({
   apiKey,
   model,
-  text,
-  direction,
+  prompt,
   signal,
   onDelta,
 }: StreamTranslateParams): Promise<void> => {
@@ -59,14 +59,13 @@ export const streamTranslate = async ({
     apiKey,
     fetch: tauriFetch,
   });
-  const { system, prompt } = buildTranslatePrompt(text, direction);
 
   // AI SDK 的 textStream 不递出错误：错误经 onError 汇集，流结束后统一抛出
   let failure: unknown;
   const result = streamText({
     model: provider.chatModel(model),
-    system,
-    prompt,
+    system: prompt.system,
+    prompt: prompt.prompt,
     abortSignal: signal,
     onError: (error) => {
       failure = error;
@@ -78,4 +77,73 @@ export const streamTranslate = async ({
   if (failure !== undefined) {
     throw failure instanceof Error ? failure : new Error(String(failure));
   }
+};
+
+/**
+ * 流式翻译会话状态：中止控制器生命周期、发起时现取 key/模型、delta 追加；
+ * 翻译中再触发即中止上一次（主动中止不算失败），卸载时自动中止。
+ * 划词翻译浮层与主窗口翻译页共用；缺 key 的处置（浮层报错 / 工作台引导态）
+ * 经 onMissingKey 交给调用方，未提供时回退浮层的报错文案。
+ */
+export const useTranslateStream = (options?: { onMissingKey?: () => void }) => {
+  const [output, setOutput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stopStream = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  };
+
+  // 路由切走/浮层销毁即中止：流回调不再触碰已卸载的页面状态
+  useEffect(() => () => stopStream(), []);
+
+  /** 中止当前流并清空译文与错误态，下一次翻译从干净现场开始。 */
+  const reset = () => {
+    stopStream();
+    setOutput("");
+    setError(null);
+    setStreaming(false);
+  };
+
+  /** 流式翻译一条提示词；发起即取代上一次进行中的请求。 */
+  const run = async (prompt: TranslatePrompt) => {
+    stopStream();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setOutput("");
+    setError(null);
+    setStreaming(true);
+    try {
+      // 每次发起都现取凭据与模型名：设置页改一处，下一发即生效
+      const apiKey = await getTranslateApiKey();
+      if (!apiKey) {
+        if (options?.onMissingKey) options.onMissingKey();
+        else setError("未配置 DeepSeek API Key，请在主窗口「设置 → 划词翻译」填写");
+        return;
+      }
+      const model = await getTranslateModel();
+      await streamTranslate({
+        apiKey,
+        model,
+        prompt,
+        signal: controller.signal,
+        onDelta: (delta) => setOutput((prev) => prev + delta),
+      });
+    } catch (cause) {
+      // 换方向/再触发导致的中止不是失败
+      if (!controller.signal.aborted) {
+        console.error("翻译请求失败", cause);
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setStreaming(false);
+      }
+    }
+  };
+
+  return { output, setOutput, error, setError, streaming, run, stop: stopStream, reset };
 };

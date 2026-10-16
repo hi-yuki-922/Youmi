@@ -16,6 +16,7 @@ import { Route as MainEncodingRouteImport } from './routes/_main/encoding'
 import { Route as MainJsonRouteImport } from './routes/_main/json'
 import { Route as MainPasswordBookRouteImport } from './routes/_main/password-book'
 import { Route as MainSettingsRouteImport } from './routes/_main/settings'
+import { Route as MainTranslateRouteImport } from './routes/_main/translate'
 import { Route as OverlayClipboardRouteImport } from './routes/overlay/clipboard'
 import { Route as OverlayPaletteRouteImport } from './routes/overlay/palette'
 import { Route as OverlayTranslateRouteImport } from './routes/overlay/translate'
@@ -54,6 +55,11 @@ const MainSettingsRoute = MainSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => MainRoute,
 } as any)
+const MainTranslateRoute = MainTranslateRouteImport.update({
+  id: '/translate',
+  path: '/translate',
+  getParentRoute: () => MainRoute,
+} as any)
 const OverlayClipboardRoute = OverlayClipboardRouteImport.update({
   id: '/overlay/clipboard',
   path: '/overlay/clipboard',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/json': typeof MainJsonRoute
   '/password-book': typeof MainPasswordBookRoute
   '/settings': typeof MainSettingsRoute
+  '/translate': typeof MainTranslateRoute
   '/overlay/clipboard': typeof OverlayClipboardRoute
   '/overlay/palette': typeof OverlayPaletteRoute
   '/overlay/translate': typeof OverlayTranslateRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/json': typeof MainJsonRoute
   '/password-book': typeof MainPasswordBookRoute
   '/settings': typeof MainSettingsRoute
+  '/translate': typeof MainTranslateRoute
   '/overlay/clipboard': typeof OverlayClipboardRoute
   '/overlay/palette': typeof OverlayPaletteRoute
   '/overlay/translate': typeof OverlayTranslateRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/_main/json': typeof MainJsonRoute
   '/_main/password-book': typeof MainPasswordBookRoute
   '/_main/settings': typeof MainSettingsRoute
+  '/_main/translate': typeof MainTranslateRoute
   '/overlay/clipboard': typeof OverlayClipboardRoute
   '/overlay/palette': typeof OverlayPaletteRoute
   '/overlay/translate': typeof OverlayTranslateRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/json'
     | '/password-book'
     | '/settings'
+    | '/translate'
     | '/overlay/clipboard'
     | '/overlay/palette'
     | '/overlay/translate'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/json'
     | '/password-book'
     | '/settings'
+    | '/translate'
     | '/overlay/clipboard'
     | '/overlay/palette'
     | '/overlay/translate'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
     | '/_main/json'
     | '/_main/password-book'
     | '/_main/settings'
+    | '/_main/translate'
     | '/overlay/clipboard'
     | '/overlay/palette'
     | '/overlay/translate'
@@ -200,6 +212,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainSettingsRouteImport
       parentRoute: typeof MainRoute
     }
+    '/_main/translate': {
+      id: '/_main/translate'
+      path: '/translate'
+      fullPath: '/translate'
+      preLoaderRoute: typeof MainTranslateRouteImport
+      parentRoute: typeof MainRoute
+    }
     '/overlay/clipboard': {
       id: '/overlay/clipboard'
       path: '/overlay/clipboard'
@@ -230,6 +249,7 @@ interface MainRouteChildren {
   MainJsonRoute: typeof MainJsonRoute
   MainPasswordBookRoute: typeof MainPasswordBookRoute
   MainSettingsRoute: typeof MainSettingsRoute
+  MainTranslateRoute: typeof MainTranslateRoute
   MainIndexRoute: typeof MainIndexRoute
 }
 
@@ -239,6 +259,7 @@ const MainRouteChildren: MainRouteChildren = {
   MainJsonRoute: MainJsonRoute,
   MainPasswordBookRoute: MainPasswordBookRoute,
   MainSettingsRoute: MainSettingsRoute,
+  MainTranslateRoute: MainTranslateRoute,
   MainIndexRoute: MainIndexRoute,
 }
 

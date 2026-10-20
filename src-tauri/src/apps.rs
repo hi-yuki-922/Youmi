@@ -6,10 +6,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
-use tauri::State;
+use sha2::{Digest, Sha256};
+use tauri::{AppHandle, Manager, State};
 
 use crate::platform;
 
@@ -67,6 +68,58 @@ pub async fn apps_launch(path: String) -> Result<(), String> {
     })
     .await
     .map_err(|e| format!("启动任务执行失败: {e}"))?
+}
+
+/// 应用图标 PNG（.lnk 解析到目标的 32×32 图标）：磁盘缓存命中直接回，未命中
+/// 提取后落缓存，键 = 路径 + 修改时间（lnk 更换即失效）。提取失败返回 None——
+/// 前端回退通用图标，属正常路径不算错误；缓存读写失败只丢加速不丢功能。
+#[tauri::command]
+pub async fn apps_icon(app: AppHandle, path: String) -> Option<Vec<u8>> {
+    let icon_path = PathBuf::from(&path);
+    if !is_lnk(&icon_path) {
+        return None;
+    }
+    let cache_dir = app.path().app_data_dir().ok().map(|dir| dir.join("icons"));
+    tauri::async_runtime::spawn_blocking(move || {
+        let mtime = std::fs::metadata(&icon_path).ok()?.modified().ok()?;
+        let cached_file = cache_dir
+            .as_ref()
+            .map(|dir| dir.join(format!("{}.png", icon_cache_key(&path, mtime))));
+        if let Some(file) = &cached_file {
+            if let Ok(bytes) = std::fs::read(file) {
+                return Some(bytes);
+            }
+        }
+        let png = platform::extract_icon_png(&path)?;
+        if let Some(file) = &cached_file {
+            if let Some(dir) = file.parent() {
+                let _ = std::fs::create_dir_all(dir);
+                let _ = std::fs::write(file, &png);
+            }
+        }
+        Some(png)
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+/// 图标缓存文件名：sha256("路径\n修改时间秒") hex。文件名即失效语义——
+/// 同名路径被换成别的应用（mtime 变化）后缓存自然失效。
+fn icon_cache_key(path: &str, mtime: SystemTime) -> String {
+    let secs = mtime
+        .duration_since(UNIX_EPOCH)
+        .map(|age| age.as_secs())
+        .unwrap_or(0);
+    let mut hasher = Sha256::new();
+    hasher.update(path.as_bytes());
+    hasher.update([b'\n']);
+    hasher.update(secs.to_le_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// 缓存超龄或为空时在后台线程重扫；进行中的扫描用 scanning 标志去重。
@@ -211,7 +264,9 @@ fn dedupe(links: Vec<ScannedLink>) -> Vec<AppEntry> {
 
 #[cfg(test)]
 mod tests {
-    use super::{dedupe, scan, ScannedLink};
+    use std::time::{Duration, UNIX_EPOCH};
+
+    use super::{dedupe, icon_cache_key, scan, ScannedLink};
     use crate::test_support::TempDir;
 
     fn link(name: &str, path: &str, rank: u8) -> ScannedLink {
@@ -302,5 +357,25 @@ mod tests {
     fn scan_ignores_missing_roots() {
         let dir = TempDir::new("apps-missing");
         assert!(scan(&[(dir.path().join("nope"), 0)]).is_empty());
+    }
+
+    #[test]
+    fn icon_cache_key_is_deterministic_and_invalidated_by_mtime_or_path() {
+        let base = icon_cache_key(r"C:\u\WeChat.lnk", UNIX_EPOCH + Duration::from_secs(100));
+        assert_eq!(base.len(), 64);
+        // 同输入稳定（两次会话命中同一缓存文件的前提）
+        assert_eq!(
+            base,
+            icon_cache_key(r"C:\u\WeChat.lnk", UNIX_EPOCH + Duration::from_secs(100))
+        );
+        // lnk 被替换（mtime 变化）或不同应用都要换 key
+        assert_ne!(
+            base,
+            icon_cache_key(r"C:\u\WeChat.lnk", UNIX_EPOCH + Duration::from_secs(101))
+        );
+        assert_ne!(
+            base,
+            icon_cache_key(r"C:\u\Other.lnk", UNIX_EPOCH + Duration::from_secs(100))
+        );
     }
 }

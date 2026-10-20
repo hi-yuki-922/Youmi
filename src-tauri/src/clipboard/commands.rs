@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use base64::Engine as _;
-use tauri::{Manager, State};
+use tauri::{Emitter as _, Manager, State};
 
 use super::engine::ClipboardEngine;
 use super::model::ClipboardKind;
@@ -13,6 +13,9 @@ use crate::platform::{ClipboardAccess as _, WinClipboardAccess};
 
 /// 默认单次查询条数。
 const DEFAULT_QUERY_LIMIT: u32 = 100;
+
+/// 面板回填回调：发送插入事件并聚焦面板，返回事件是否发送成功。
+type PaletteTextInserter = Box<dyn Fn(&str) -> bool + Send>;
 
 pub struct ClipboardState {
     pub engine: Arc<ClipboardEngine>,
@@ -107,6 +110,7 @@ pub fn clipboard_write_own_image_png(
 /// 回帖：条目写剪贴板（自家通道不入史）→ 浮层隐藏、焦点交还呼出浮层前的
 /// 窗口 → 模拟 Ctrl+V → 延迟恢复用户原剪贴板。无有效目标或焦点/键击失败
 /// 时降级为 `copied-only`（条目留在剪贴板供手动粘贴）。
+/// 命令面板可见时例外：无有效目标的文本条目回填面板输入框（`inserted-to-palette`）。
 #[tauri::command]
 pub async fn clipboard_pasteback(
     app: tauri::AppHandle,
@@ -114,6 +118,30 @@ pub async fn clipboard_pasteback(
     pasteback: State<'_, PastebackState>,
     id: i64,
 ) -> Result<PastebackOutcome, String> {
+    // 面板可见 = 浮层共存上下文（呼出剪贴板浮层时前台是面板，捕获目标为空）：
+    // 文本条目回填面板输入框而非降级仅复制
+    let palette_open = app
+        .get_webview_window(crate::palette::LABEL)
+        .is_some_and(|window| window.is_visible().unwrap_or(false));
+    let insert_palette_text: Option<PaletteTextInserter> = palette_open.then({
+        let app = app.clone();
+        move || {
+            Box::new(move |text: &str| -> bool {
+                if let Err(e) = app.emit_to(
+                    crate::palette::LABEL,
+                    crate::palette::INSERT_TEXT_EVENT,
+                    text,
+                ) {
+                    eprintln!("youmi: 面板回填事件发送失败: {e}");
+                    return false;
+                }
+                if let Some(palette) = app.get_webview_window(crate::palette::LABEL) {
+                    let _ = palette.set_focus();
+                }
+                true
+            }) as Box<dyn Fn(&str) -> bool + Send>
+        }
+    });
     let deps = pasteback::PastebackDeps {
         repo: Arc::clone(&state.repo),
         engine: Arc::clone(&state.engine),
@@ -126,11 +154,19 @@ pub async fn clipboard_pasteback(
     };
     // 编排含焦点等待与键击注入，放阻塞线程池，不占 async runtime
     tauri::async_runtime::spawn_blocking(move || {
-        pasteback::run(&deps, id, &|| {
-            if let Some(window) = app.get_webview_window(crate::CLIPBOARD_OVERLAY_LABEL) {
-                let _ = window.hide();
-            }
-        })
+        let insert = insert_palette_text
+            .as_deref()
+            .map(|f| f as &dyn Fn(&str) -> bool);
+        pasteback::run(
+            &deps,
+            id,
+            &|| {
+                if let Some(window) = app.get_webview_window(crate::CLIPBOARD_OVERLAY_LABEL) {
+                    let _ = window.hide();
+                }
+            },
+            insert,
+        )
     })
     .await
     .map_err(|e| format!("回帖任务执行失败: {e}"))?

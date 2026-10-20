@@ -260,8 +260,9 @@ pub fn run() {
             }
         })
         .setup(move |app| {
-            // 固定浮层状态先于浮层窗口创建管理：失焦 handler 首次触发就能读到
+            // 浮层状态先于浮层窗口创建管理：失焦 handler 首次触发就能读到
             app.manage(overlay::PinnedOverlays::default());
+            app.manage(overlay::OverlayRegistry::default());
             setup_tray(app)?;
             setup_clipboard(app);
             setup_vault(app);
@@ -297,6 +298,7 @@ pub fn run() {
             palette::palette_open_tool,
             apps::apps_query,
             apps::apps_launch,
+            apps::apps_icon,
             overlay::overlay_set_pinned,
             shortcuts::shortcut_list,
             shortcuts::shortcut_record_begin,

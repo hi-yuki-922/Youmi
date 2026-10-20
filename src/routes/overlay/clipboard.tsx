@@ -103,7 +103,8 @@ const ClipboardOverlay = () => {
   });
 
   // 回帖不改变历史（Rust 自家写入通道 + 完成后恢复原剪贴板），无需 invalidate；
-  // 浮层由 Rust 侧在回帖流程中隐藏。copied-only 属正常降级，不打扰用户。
+  // 浮层由 Rust 侧在回帖流程中隐藏。copied-only（降级）与 inserted-to-palette
+  // （回填命令面板）均属正常结果，不打扰用户。
   const pastebackMutation = useMutation({
     mutationFn: (id: number) => pastebackClipboardEntry(id),
     onError: (error) => {

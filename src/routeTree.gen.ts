@@ -13,6 +13,7 @@ import { Route as MainRouteImport } from './routes/_main'
 import { Route as MainIndexRouteImport } from './routes/_main/index'
 import { Route as MainDiffRouteImport } from './routes/_main/diff'
 import { Route as MainEncodingRouteImport } from './routes/_main/encoding'
+import { Route as MainExchangeRouteImport } from './routes/_main/exchange'
 import { Route as MainJsonRouteImport } from './routes/_main/json'
 import { Route as MainPasswordBookRouteImport } from './routes/_main/password-book'
 import { Route as MainSettingsRouteImport } from './routes/_main/settings'
@@ -38,6 +39,11 @@ const MainDiffRoute = MainDiffRouteImport.update({
 const MainEncodingRoute = MainEncodingRouteImport.update({
   id: '/encoding',
   path: '/encoding',
+  getParentRoute: () => MainRoute,
+} as any)
+const MainExchangeRoute = MainExchangeRouteImport.update({
+  id: '/exchange',
+  path: '/exchange',
   getParentRoute: () => MainRoute,
 } as any)
 const MainJsonRoute = MainJsonRouteImport.update({
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/': typeof MainIndexRoute
   '/diff': typeof MainDiffRoute
   '/encoding': typeof MainEncodingRoute
+  '/exchange': typeof MainExchangeRoute
   '/json': typeof MainJsonRoute
   '/password-book': typeof MainPasswordBookRoute
   '/settings': typeof MainSettingsRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/diff': typeof MainDiffRoute
   '/encoding': typeof MainEncodingRoute
+  '/exchange': typeof MainExchangeRoute
   '/json': typeof MainJsonRoute
   '/password-book': typeof MainPasswordBookRoute
   '/settings': typeof MainSettingsRoute
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/_main': typeof MainRouteWithChildren
   '/_main/diff': typeof MainDiffRoute
   '/_main/encoding': typeof MainEncodingRoute
+  '/_main/exchange': typeof MainExchangeRoute
   '/_main/json': typeof MainJsonRoute
   '/_main/password-book': typeof MainPasswordBookRoute
   '/_main/settings': typeof MainSettingsRoute
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/'
     | '/diff'
     | '/encoding'
+    | '/exchange'
     | '/json'
     | '/password-book'
     | '/settings'
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
   to:
     | '/diff'
     | '/encoding'
+    | '/exchange'
     | '/json'
     | '/password-book'
     | '/settings'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/_main'
     | '/_main/diff'
     | '/_main/encoding'
+    | '/_main/exchange'
     | '/_main/json'
     | '/_main/password-book'
     | '/_main/settings'
@@ -189,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/encoding'
       fullPath: '/encoding'
       preLoaderRoute: typeof MainEncodingRouteImport
+      parentRoute: typeof MainRoute
+    }
+    '/_main/exchange': {
+      id: '/_main/exchange'
+      path: '/exchange'
+      fullPath: '/exchange'
+      preLoaderRoute: typeof MainExchangeRouteImport
       parentRoute: typeof MainRoute
     }
     '/_main/json': {
@@ -246,6 +265,7 @@ declare module '@tanstack/react-router' {
 interface MainRouteChildren {
   MainDiffRoute: typeof MainDiffRoute
   MainEncodingRoute: typeof MainEncodingRoute
+  MainExchangeRoute: typeof MainExchangeRoute
   MainJsonRoute: typeof MainJsonRoute
   MainPasswordBookRoute: typeof MainPasswordBookRoute
   MainSettingsRoute: typeof MainSettingsRoute
@@ -256,6 +276,7 @@ interface MainRouteChildren {
 const MainRouteChildren: MainRouteChildren = {
   MainDiffRoute: MainDiffRoute,
   MainEncodingRoute: MainEncodingRoute,
+  MainExchangeRoute: MainExchangeRoute,
   MainJsonRoute: MainJsonRoute,
   MainPasswordBookRoute: MainPasswordBookRoute,
   MainSettingsRoute: MainSettingsRoute,

@@ -1,9 +1,12 @@
 //! 浮层窗口模式：无边框、置顶、失焦即隐（hide 不销毁）。剪贴板浮层与命令
 //! 面板定位到鼠标所在显示器居中，划词翻译定位到光标旁。
 //! 被用户固定的浮层（固定浮层）不因失焦自动隐藏。
+//! 浮层之间可共存：失焦是焦点转移到兄弟浮层所致时不隐藏（失焦后延迟
+//! 复查焦点去向），焦点离开浮层家族才全家隐藏。
 
 use std::collections::HashSet;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindow,
@@ -53,6 +56,20 @@ pub fn overlay_set_pinned(
     Ok(())
 }
 
+/// 已注册浮层窗口 label 集合：失焦复查用——判定焦点是否仍在浮层家族内。
+#[derive(Default)]
+pub struct OverlayRegistry(Mutex<Vec<String>>);
+
+impl OverlayRegistry {
+    fn register(&self, label: &str) {
+        self.0.lock().unwrap().push(label.to_string());
+    }
+
+    fn labels(&self) -> Vec<String> {
+        self.0.lock().unwrap().clone()
+    }
+}
+
 /// 创建一个隐藏的浮层窗口并挂上失焦即隐。`size` 为逻辑像素宽高。
 /// 窗口以 hide 代替销毁，保证再次呼起瞬时。
 ///
@@ -76,6 +93,10 @@ pub fn create(
         .inner_size(size.width, size.height)
         .build()?;
 
+    if let Some(registry) = app.try_state::<OverlayRegistry>() {
+        registry.register(label);
+    }
+
     let owner = app.clone();
     let hidden_label = label.to_string();
     window.on_window_event(move |event| {
@@ -87,12 +108,47 @@ pub fn create(
             if pinned {
                 return;
             }
-            if let Some(window) = owner.get_webview_window(&hidden_label) {
-                let _ = window.hide();
-            }
+            schedule_family_blur_check(owner.clone());
         }
     });
     Ok(())
+}
+
+/// 失焦复查延迟：留足焦点落到目标窗口并派发 Focused(true) 的时间，又短到
+/// 肉眼不觉得隐藏迟滞。
+const BLUR_CHECK_DELAY: Duration = Duration::from_millis(150);
+
+/// 浮层失焦后延迟复查：`Focused(false)` 不携带焦点去向，等焦点落地后看
+/// 家族内是否还有浮层持有焦点——有（含自己重新聚焦的呼起竞态）则全家保留，
+/// 没有则隐藏所有可见的未固定浮层。浮层要么共存，要么一起退场。
+fn schedule_family_blur_check(app: AppHandle) {
+    let spawned = std::thread::Builder::new()
+        .name("overlay-blur-check".into())
+        .spawn(move || {
+            std::thread::sleep(BLUR_CHECK_DELAY);
+            let Some(registry) = app.try_state::<OverlayRegistry>() else {
+                return;
+            };
+            let windows: Vec<WebviewWindow> = registry
+                .labels()
+                .iter()
+                .filter_map(|label| app.get_webview_window(label))
+                .collect();
+            if windows.iter().any(|w| w.is_focused().unwrap_or(false)) {
+                return;
+            }
+            let pinned = app.try_state::<PinnedOverlays>();
+            for window in windows {
+                if window.is_visible().unwrap_or(false)
+                    && !pinned.as_ref().is_some_and(|p| p.is_pinned(window.label()))
+                {
+                    let _ = window.hide();
+                }
+            }
+        });
+    if let Err(e) = spawned {
+        eprintln!("youmi: 浮层失焦复查线程启动失败: {e}");
+    }
 }
 
 /// 呼起/隐藏浮层：可见且聚焦则隐藏，否则移到鼠标所在显示器居中并聚焦显示。

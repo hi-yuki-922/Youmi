@@ -23,6 +23,10 @@ export const listApps = (): Promise<AppsSnapshot> => invoke<AppsSnapshot>("apps_
 /** 启动开始菜单快捷方式；成功后调用方负责收起面板。 */
 export const launchApp = (path: string): Promise<void> => invoke<void>("apps_launch", { path });
 
+/** 应用图标 PNG（Rust 侧带磁盘缓存）；null = 提取失败，调用方回退通用图标。 */
+export const fetchAppIcon = (path: string): Promise<number[] | null> =>
+  invoke<number[] | null>("apps_icon", { path });
+
 /** 应用模糊搜索：按名称取最高分排序，同分按名称稳定排序，截取前 N；空查询不展示应用（面板空查询只列 Youmi 工具）。 */
 export const searchApps = (apps: AppEntry[], query: string): AppEntry[] => {
   if (query === "") return [];

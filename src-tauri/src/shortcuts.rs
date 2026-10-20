@@ -360,6 +360,10 @@ pub fn activate(app: &AppHandle, action: ShortcutAction) {
             if let Err(e) = crate::overlay::toggle(app, crate::palette::LABEL) {
                 eprintln!("youmi: 呼出命令面板失败: {e}");
             }
+            // 清空上次查询走呼起事件而非 focus：浮层共存后焦点从兄弟浮层回落
+            // 同样触发 focus，那里清空会丢掉回填内容与上下文；收起分支发出的事件
+            // 恰好为下次召起复位
+            let _ = app.emit_to(crate::palette::LABEL, crate::palette::RESET_EVENT, ());
         }
         ShortcutAction::Translate => {
             // 取词必须先于显示（Ctrl+C 发给呼起时仍在前台的目标应用），

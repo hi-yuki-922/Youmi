@@ -14,8 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/Select";
-import { hasTranslateApiKey, useTranslateStream } from "@/lib/translate";
+import { subscribeToolText, takePendingToolText } from "@/lib/slash";
 import { restoreOneOf, restoreString, usePersistedToolState } from "@/lib/tool-state";
+import { hasTranslateApiKey, useTranslateStream } from "@/lib/translate";
 import { cn } from "@/lib/utils";
 import {
   buildTranslatePairPrompt,
@@ -118,6 +119,22 @@ const TranslatePage = () => {
     if (!isTranslatable(input)) return;
     void run(buildTranslatePairPrompt(input, source, target));
   };
+
+  // 命令面板 /t 直达：填入文本并立即翻译（进行中的请求先中止，与手动再触发一致）
+  const translateDelivered = (text: string) => {
+    stop();
+    setInput(text);
+    if (!isTranslatable(text)) return;
+    void run(buildTranslatePairPrompt(text, source, target));
+  };
+
+  // 挂载时取走积压文本（刚切路由的场景），存续期订阅直送（已在翻译页的场景）；
+  // 依赖只有语言对：translateDelivered 逐渲染重建，重挂以直送方向恒为当前选择
+  useEffect(() => {
+    const pending = takePendingToolText("translate");
+    if (pending) translateDelivered(pending);
+    return subscribeToolText("translate", translateDelivered);
+  }, [source, target]);
 
   // 双侧各只有中/英：一侧选成与对侧相同即整体对调，恒保持源 ≠ 目标
   const changeSource = (next: TranslateLanguage) => {

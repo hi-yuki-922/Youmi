@@ -11,6 +11,8 @@ pub use windows::apps::launch_lnk;
 #[cfg(windows)]
 pub use windows::clipboard::{WinClipboardAccess, WinClipboardWatcher};
 #[cfg(windows)]
+pub use windows::icons::extract_icon_png;
+#[cfg(windows)]
 pub use windows::pasteback::WinPastebackAccess;
 #[cfg(windows)]
 pub use windows::record::WinShortcutRecorder;

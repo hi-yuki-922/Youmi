@@ -74,3 +74,19 @@ export const restoreOneOf =
   <T>(values: readonly T[]) =>
   (value: unknown): T | undefined =>
     values.some((candidate) => candidate === value) ? (value as T) : undefined;
+
+/**
+ * 字符串数组字段恢复：逐项过滤进候选集并去重保序（如目标币种行）。
+ * 空结果或形状不符回退 undefined 由调用方给默认值——列表类状态不允许存档
+ * 把页面打成空壳。
+ */
+export const restoreStringArray =
+  (values: readonly string[]) =>
+  (value: unknown): string[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const cleaned = value.filter(
+      (entry): entry is string =>
+        typeof entry === "string" && values.some((candidate) => candidate === entry),
+    );
+    return [...new Set(cleaned)];
+  };

@@ -5,6 +5,8 @@
 //!   本进程主窗口（先唤起再粘贴）都可作目标；浮层窗口不作目标。
 //! - 无有效目标（托盘直启、目标已关闭、浮层前台）或焦点/键击失败时降级为
 //!   "仅复制"：条目留在剪贴板供手动粘贴，不模拟键击。
+//! - 命令面板可见时无目标不降级为仅复制，改为回填：文本条目经事件插入面板
+//!   输入框光标处，不写剪贴板、不模拟键击，浮层收起、焦点交还面板。
 //! - 回帖成功后延迟恢复用户原剪贴板，恢复带序号守卫：延迟窗口内用户复制了
 //!   新内容则放弃恢复，保护新内容。
 
@@ -40,12 +42,14 @@ impl PastebackState {
     }
 }
 
-/// 回帖结果。`CopiedOnly` = 条目已写入剪贴板但未模拟粘贴（降级路径）。
+/// 回帖结果。`CopiedOnly` = 条目已写入剪贴板但未模拟粘贴（降级路径）；
+/// `InsertedToPalette` = 文本条目经事件回填命令面板输入框（面板可见路径）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PastebackOutcome {
     Pasted,
     CopiedOnly,
+    InsertedToPalette,
 }
 
 /// 执行一次回帖所需的协作对象（测试注入 fake 的接缝）。
@@ -63,16 +67,29 @@ pub struct PastebackDeps {
 }
 
 /// 执行一次回帖。`hide_overlay` 在浮层不再需要时调用（成功与降级路径都要隐藏）。
+/// `insert_palette_text` = Some 表示命令面板可见：无有效目标时文本条目回填面板
+/// 而非降级仅复制，回调发送事件并聚焦面板，返回 false（发送失败）则照常降级。
 pub fn run(
     deps: &PastebackDeps,
     id: i64,
     hide_overlay: &dyn Fn(),
+    insert_palette_text: Option<&dyn Fn(&str) -> bool>,
 ) -> Result<PastebackOutcome, String> {
     let content = deps
         .repo
         .entry_content(id)
         .map_err(|e| format!("读取条目 {id} 失败: {e}"))?
         .ok_or_else(|| format!("条目 {id} 不存在"))?;
+
+    // 有效回帖目标优先于面板回填；图片条目无法回填文本输入框，照常走回帖/降级
+    if valid_target(deps).is_none() {
+        if let (ClipboardContent::Text(text), Some(insert)) = (&content, insert_palette_text) {
+            if insert(text) {
+                hide_overlay();
+                return Ok(PastebackOutcome::InsertedToPalette);
+            }
+        }
+    }
 
     let clipboard = deps.engine.access().clone();
     let saved = clipboard.read();
@@ -426,7 +443,7 @@ mod tests {
     ) -> Result<PastebackOutcome, String> {
         let d = deps(h, target, restore_delay);
         let hides = Arc::clone(&h.hides);
-        super::run(&d, id, &move || *hides.lock().unwrap() += 1)
+        super::run(&d, id, &move || *hides.lock().unwrap() += 1, None)
     }
 
     /// 主窗口目标路径：deps 携带主窗口句柄。
@@ -437,7 +454,19 @@ mod tests {
     ) -> Result<PastebackOutcome, String> {
         let d = deps_toward(h, target, Some(MAIN), Duration::ZERO);
         let hides = Arc::clone(&h.hides);
-        super::run(&d, id, &move || *hides.lock().unwrap() += 1)
+        super::run(&d, id, &move || *hides.lock().unwrap() += 1, None)
+    }
+
+    /// 面板回填路径：`insert` = Some 表示命令面板可见。
+    fn run_insert(
+        h: &Harness,
+        target: Option<isize>,
+        insert: Option<&dyn Fn(&str) -> bool>,
+        id: i64,
+    ) -> Result<PastebackOutcome, String> {
+        let d = deps(h, target, Duration::ZERO);
+        let hides = Arc::clone(&h.hides);
+        super::run(&d, id, &move || *hides.lock().unwrap() += 1, insert)
     }
 
     fn history_texts(h: &Harness) -> Vec<String> {
@@ -716,6 +745,101 @@ mod tests {
 
         assert!(outcome.is_err());
         assert_eq!(*h.hides.lock().unwrap(), 0);
+    }
+
+    #[test]
+    fn pasteback_text_entry_with_palette_open_inserts_into_palette() {
+        // 面板可见 + 无有效目标（呼出剪贴板浮层时前台是面板）：文本回填面板，
+        // 不写剪贴板、不模拟键击
+        let input = FakeInput::new(HashMap::new());
+        let h = harness(input);
+        h.repo
+            .capture(&ClipboardContent::Text("hello".into()))
+            .unwrap();
+        h.clip
+            .set_content(ClipboardContent::Text("user-content".into()));
+
+        let inserted = Arc::new(StdMutex::new(None::<String>));
+        let recorder = Arc::clone(&inserted);
+        let insert = |text: &str| {
+            *recorder.lock().unwrap() = Some(text.into());
+            true
+        };
+        let outcome = run_insert(&h, None, Some(&insert), 1).unwrap();
+
+        assert_eq!(outcome, PastebackOutcome::InsertedToPalette);
+        assert_eq!(inserted.lock().unwrap().as_deref(), Some("hello"));
+        assert_eq!(*h.hides.lock().unwrap(), 1);
+        // 回填不碰剪贴板：用户原内容原样保留，也没有键击注入
+        assert!(h.clip.writes().is_empty());
+        assert_eq!(
+            h.clip.content(),
+            Some(ClipboardContent::Text("user-content".into()))
+        );
+        assert!(h.input.calls().is_empty());
+    }
+
+    #[test]
+    fn pasteback_valid_target_wins_over_palette_insert() {
+        // 有效回帖目标存在（如固定面板开着但呼出时前台是外部窗口）：照常回帖
+        let input = FakeInput::new(HashMap::from([(TARGET, FOREIGN_PID)]))
+            .set_foreground_in(TARGET)
+            .grant_focus();
+        let h = harness(input);
+        h.repo
+            .capture(&ClipboardContent::Text("hello".into()))
+            .unwrap();
+
+        let inserted = Arc::new(StdMutex::new(None::<String>));
+        let recorder = Arc::clone(&inserted);
+        let insert = |text: &str| {
+            *recorder.lock().unwrap() = Some(text.into());
+            true
+        };
+        let outcome = run_insert(&h, Some(TARGET), Some(&insert), 1).unwrap();
+
+        assert_eq!(outcome, PastebackOutcome::Pasted);
+        assert!(inserted.lock().unwrap().is_none());
+        assert_eq!(h.input.calls(), vec![Call::Focus(TARGET), Call::Paste]);
+    }
+
+    #[test]
+    fn pasteback_image_entry_with_palette_open_pastes_back_normally() {
+        // 图片条目无法回填文本输入框：面板开着也照常走回帖/降级
+        let input = FakeInput::new(HashMap::new());
+        let h = harness(input);
+        h.repo
+            .capture(&ClipboardContent::ImagePng(vec![9, 9, 9]))
+            .unwrap();
+
+        let insert = |_text: &str| true;
+        let outcome = run_insert(&h, None, Some(&insert), 1).unwrap();
+
+        assert_eq!(outcome, PastebackOutcome::CopiedOnly);
+        assert!(h
+            .clip
+            .writes()
+            .contains(&ClipboardContent::ImagePng(vec![9, 9, 9])));
+    }
+
+    #[test]
+    fn pasteback_insert_failure_degrades_to_copy_only() {
+        // 插入失败（面板窗口已失效等）：照常降级为仅复制
+        let input = FakeInput::new(HashMap::new());
+        let h = harness(input);
+        h.repo
+            .capture(&ClipboardContent::Text("hello".into()))
+            .unwrap();
+
+        let insert = |_text: &str| false;
+        let outcome = run_insert(&h, None, Some(&insert), 1).unwrap();
+
+        assert_eq!(outcome, PastebackOutcome::CopiedOnly);
+        assert_eq!(*h.hides.lock().unwrap(), 1);
+        assert!(h
+            .clip
+            .writes()
+            .contains(&ClipboardContent::Text("hello".into())));
     }
 
     #[test]

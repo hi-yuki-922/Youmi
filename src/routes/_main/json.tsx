@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { ClearButton } from "@/components/ClearButton";
 import { CopyButton } from "@/components/CopyButton";
+import { LabeledCodeEditor } from "@/components/CodeEditor";
 import { Button } from "@/components/ui/Button";
 import { FeedbackStrip } from "@/components/ui/FeedbackStrip";
-import { LabeledTextarea } from "@/components/ui/LabeledTextarea";
 import {
   Select,
   SelectContent,
@@ -140,14 +140,21 @@ const JsonToolPage = () => {
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
-        <LabeledTextarea
+        <LabeledCodeEditor
           label="输入"
+          ariaLabel="JSON 输入"
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={setInput}
           placeholder="粘贴或输入 JSON 文本"
           action={<ClearButton label="清空输入" onClick={clearInput} disabled={input === ""} />}
         />
-        <LabeledTextarea label="输出" value={output} readOnly placeholder="结果将显示在这里" />
+        <LabeledCodeEditor
+          label="输出"
+          ariaLabel="JSON 输出"
+          value={output}
+          readOnly
+          placeholder="结果将显示在这里"
+        />
       </div>
     </div>
   );

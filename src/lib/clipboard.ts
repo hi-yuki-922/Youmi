@@ -65,8 +65,9 @@ export const writeClipboardText = (text: string): Promise<void> =>
 export const writeOwnClipboardText = (text: string): Promise<void> =>
   invoke<void>("clipboard_write_own_text", { text });
 
-/** 回帖结果（Rust `PastebackOutcome` kebab-case 序列化）。 */
-export type PastebackOutcome = "pasted" | "copied-only";
+/** 回帖结果（Rust `PastebackOutcome` kebab-case 序列化）。
+ * `inserted-to-palette` = 命令面板可见，文本条目经事件回填面板输入框（不碰剪贴板）。 */
+export type PastebackOutcome = "pasted" | "copied-only" | "inserted-to-palette";
 
 /** 回帖：条目写剪贴板（不入史）→ 焦点交还呼出浮层前的窗口 → 模拟 Ctrl+V。
  * `copied-only` = 无有效目标或焦点/键击失败，条目留在剪贴板供手动粘贴。 */

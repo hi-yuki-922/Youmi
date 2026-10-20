@@ -1,4 +1,12 @@
-import { Binary, Braces, GitCompare, KeyRound, Languages, Settings } from "lucide-react";
+import {
+  Binary,
+  Braces,
+  CircleDollarSign,
+  GitCompare,
+  KeyRound,
+  Languages,
+  Settings,
+} from "lucide-react";
 
 import { fuzzyScore } from "@/lib/fuzzy";
 
@@ -31,6 +39,13 @@ export const TOOLS = [
     label: "翻译",
     icon: Languages,
     keywords: ["translate", "translation", "deepseek", "中英互译"],
+  },
+  {
+    id: "exchange",
+    path: "/exchange",
+    label: "汇率",
+    icon: CircleDollarSign,
+    keywords: ["exchange", "rate", "currency", "汇率", "换算", "货币"],
   },
   {
     id: "password-book",

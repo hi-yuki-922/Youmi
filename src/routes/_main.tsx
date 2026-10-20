@@ -6,6 +6,7 @@ import { TitleBar } from "@/components/layout/TitleBar";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { applyClipboardCapacity } from "@/lib/clipboard";
 import { onOpenTool } from "@/lib/palette";
+import { deliverToolText } from "@/lib/slash";
 import { TOOLS } from "@/lib/tools";
 import { applyVaultLockTimeout } from "@/lib/vault";
 import { router } from "@/Router";
@@ -23,11 +24,14 @@ const MainLayout = () => {
   }, []);
 
   useEffect(() => {
-    // 命令面板直达：主窗口隐藏时 webview 仍存活、监听有效，收到工具 id 即切路由；
-    // 显示与聚焦由 Rust 侧 palette_open_tool 完成
-    const unlisten = onOpenTool((toolId) => {
+    // 命令面板直达：主窗口隐藏时 webview 仍存活、监听有效，收到事件即切路由；
+    // 显示与聚焦由 Rust 侧 palette_open_tool 完成。斜杠命令携带的文本先入
+    // 直达通道（页面未挂载则暂存），再切路由，工具页挂载/订阅时消费。
+    const unlisten = onOpenTool(({ toolId, text }) => {
       const tool = TOOLS.find((entry) => entry.id === toolId);
-      if (tool) void router.navigate({ to: tool.path });
+      if (!tool) return;
+      if (text) deliverToolText(toolId, text);
+      void router.navigate({ to: tool.path });
     });
     return () => {
       void unlisten.then((off) => off());

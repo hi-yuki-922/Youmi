@@ -15,6 +15,27 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // monaco 导入直链真实文件：rolldown-vite 对 monaco 包子路径解析不可靠
+      // （`?worker` 查询导入不转换、worker 子构建里解析失败、editor.api 时而
+      // 解析失败，实测 8.3.3），alias 指文件绕开 exports 解析
+      "monaco-api": fileURLToPath(
+        new URL("./node_modules/monaco-editor/esm/vs/editor/editor.api.js", import.meta.url),
+      ),
+      "monaco-json-contribution": fileURLToPath(
+        new URL(
+          "./node_modules/monaco-editor/esm/vs/language/json/monaco.contribution.js",
+          import.meta.url,
+        ),
+      ),
+      "monaco-json-worker": fileURLToPath(
+        new URL(
+          "./node_modules/monaco-editor/esm/vs/language/json/json.worker.js",
+          import.meta.url,
+        ),
+      ),
+      "monaco-editor-worker": fileURLToPath(
+        new URL("./node_modules/monaco-editor/esm/vs/editor/editor.worker.js", import.meta.url),
+      ),
     },
   },
 

@@ -13,6 +13,9 @@
       "allow": [
         {
           "url": "https://api.deepseek.com/*"
+        },
+        {
+          "url": "https://open.er-api.com/*"
         }
       ]
     }
